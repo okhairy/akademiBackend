@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('admin-_vigiles', function (Blueprint $table) {
+        Schema::create('admin_vigiles', function (Blueprint $table) {
             $table->id(); // Clé primaire auto-incrémentée
             $table->string('nom'); // Nom obligatoire
             $table->string('prenom'); // Prénom obligatoire

@@ -3,13 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Hash;
 
 
 
-class AdminVigile extends Model
+class AdminVigile extends Authenticatable
 {
     use HasFactory;
 
@@ -55,4 +57,6 @@ class AdminVigile extends Model
             $adminVigile->mot_de_passe = Hash::make($adminVigile->mot_de_passe);
         });
     }
+  
+  
 }

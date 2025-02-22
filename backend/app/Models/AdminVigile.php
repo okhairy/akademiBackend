@@ -8,12 +8,15 @@ use Illuminate\Notifications\Notifiable;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\HasApiTokens;
 
 
 
 class AdminVigile extends Authenticatable
 {
     use HasFactory;
+    use HasApiTokens;
+    
 
     protected $table = 'admin_vigiles'; // Nom de la table
 
@@ -34,13 +37,6 @@ class AdminVigile extends Authenticatable
 
     public $timestamps = false; // Désactive les timestamps
 
-    /**
-     * Mutateur pour hasher le mot de passe avant sauvegarde
-     */
-    public function setMotDePasseAttribute($value)
-    {
-        $this->attributes['mot_de_passe'] = Hash::make($value);
-    }
 
     /**
      * Boot method pour le modèle.
@@ -56,6 +52,11 @@ class AdminVigile extends Authenticatable
             }
             $adminVigile->mot_de_passe = Hash::make($adminVigile->mot_de_passe);
         });
+    }
+
+    public function getAuthPassword()
+    {
+        return $this->mot_de_passe;
     }
   
   

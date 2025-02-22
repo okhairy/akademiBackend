@@ -73,6 +73,16 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'admin_vigile' => [
+            'driver' => 'session',
+            'provider' => 'admin_vigiles',
+        ],
+
+        'etudiant' => [
+            'driver' => 'session',
+            'provider' => 'etudiants',
+        ],
     ],
 
     /*
@@ -96,6 +106,16 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\User::class),
+        ],
+
+        'admin_vigiles' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\AdminVigile::class,
+        ],
+
+        'etudiants' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Etudiant::class,
         ],
 
         // 'users' => [

@@ -6,78 +6,62 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\AdminVigile;
 use App\Models\Etudiant;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class AuthController extends Controller
 {
-   // Inscription d'un admin
-public function registerAdmin(Request $request)
-{
-    // Validation des données
-    $request->validate([
-        'nom' => 'required|string',
-        'prenom' => 'required|string',
-        'email' => 'required|email|unique:admin_vigiles,email',
-        'telephone' => 'required|string|unique:admin_vigiles,telephone',
-        'mot_de_passe' => 'required|string|min:8',
-    ], [
-        'email.unique' => 'Cet email est déjà utilisé par un autre administrateur.', // Message personnalisé
-        'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.', // Message personnalisé
-        'mot_de_passe.min' => 'Le mot de passe doit contenir au moins 8 caractères.', // Message personnalisé
-    ]);
-
-    // Création de l'admin
-    $admin = AdminVigile::create([
-        'nom' => $request->nom,
-        'prenom' => $request->prenom,
-        'email' => $request->email,
-        'telephone' => $request->telephone,
-        'mot_de_passe' => Hash::make($request->mot_de_passe), // Hachage du mot de passe
-        'role' => 'admin', // Rôle admin
-        'statut' => 'active', // Statut par défaut
-    ]);
-
-    // Réponse JSON en cas de succès
-    return response()->json([
-        'message' => 'Admin créé avec succès',
-        'admin' => $admin
-    ], 201); // Code HTTP 201 : Created
-}
-
-    // Inscription d'un vigile
-    public function registerVigile(Request $request)
-    {
-        $request->validate([
-            'nom' => 'required|string',
-            'prenom' => 'required|string',
-            'email' => 'required|email|unique:admin_vigiles,email',
-            'telephone' => 'required|string|unique:admin_vigiles,telephone',
-            'mot_de_passe' => 'required|string|min:8',
-        ]);
-
-        $vigile = AdminVigile::create([
-            'nom' => $request->nom,
-            'prenom' => $request->prenom,
-            'email' => $request->email,
-            'telephone' => $request->telephone,
-            'mot_de_passe' => Hash::make($request->mot_de_passe),
-            'role' => 'vigile', // Rôle vigile
-            'statut' => 'active', // Statut par défaut
-        ]);
-
-        return response()->json(['message' => 'Vigile créé avec succès', 'vigile' => $vigile], 201);
-    }
-
     // Inscription d'un étudiant
     public function registerEtudiant(Request $request)
     {
         $request->validate([
-            'nom' => 'required|string',
-            'prenom' => 'required|string',
-            'email' => 'required|email|unique:etudiants,email',
-            'telephone' => 'required|string|unique:etudiants,telephone',
-            'chambre' => 'required|string',
+            'nom' => [
+                'required',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                'regex:/^(?!.*  ).*$/'
+            ],
+            'prenom' => [
+                'required',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                'regex:/^(?!.*  ).*$/'
+            ],
+            'email' => [
+                'required',
+                'email',
+                'regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/',
+                'unique:etudiants,email'
+            ],
+            'telephone' => [
+                'required',
+                'string',
+                'regex:/^(70|75|76|77|78)[0-9]{7}$/',
+                'unique:etudiants,telephone'
+            ],
+            'chambre' => [
+                'nullable',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                'regex:/^(?!.*  ).*$/'
+            ],
             'numero_de_dossier' => 'required|integer|unique:etudiants,numero_de_dossier',
-            'mot_de_passe' => 'required|string|min:8',
+        ], [
+            'nom.required' => 'Le nom est obligatoire.',
+            'nom.regex' => 'Le nom ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+            'prenom.required' => 'Le prénom est obligatoire.',
+            'prenom.regex' => 'Le prénom ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+            'email.required' => 'L\'email est obligatoire.',
+            'email.email' => 'L\'email doit être une adresse email valide.',
+            'email.regex' => 'Le format de l\'email est incorrect.',
+            'email.unique' => 'Cet email est déjà utilisé.',
+            'telephone.required' => 'Le numéro de téléphone est obligatoire.',
+            'telephone.regex' => 'Le numéro de téléphone doit être de 9 chiffres et commencer par 70, 75, 76, 77 ou 78.',
+            'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
+            'chambre.regex' => 'La chambre ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+            'numero_de_dossier.required' => 'Le numéro de dossier est obligatoire.',
+            'numero_de_dossier.integer' => 'Le numéro de dossier doit être un entier.',
+            'numero_de_dossier.unique' => 'Ce numéro de dossier est déjà utilisé.',
         ]);
 
         $etudiant = Etudiant::create([
@@ -87,19 +71,182 @@ public function registerAdmin(Request $request)
             'telephone' => $request->telephone,
             'chambre' => $request->chambre,
             'numero_de_dossier' => $request->numero_de_dossier,
-            'mot_de_passe' => Hash::make($request->mot_de_passe),
             'statut' => 'active', // Statut par défaut
         ]);
 
         return response()->json(['message' => 'Étudiant créé avec succès', 'etudiant' => $etudiant], 201);
     }
+
+    // Mettre à jour un étudiant
+    public function updateEtudiant(Request $request, $id)
+    {
+        try {
+            
+            $etudiant = Etudiant::findOrFail($id);
+
+            $request->validate([
+                'nom' => [
+                    'sometimes',
+                    'string',
+                    'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                    'regex:/^(?!.*  ).*$/'
+                ],
+                'prenom' => [
+                    'sometimes',
+                    'string',
+                    'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                    'regex:/^(?!.*  ).*$/'
+                ],
+                'email' => [
+                    'sometimes',
+                    'email',
+                    'regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/',
+                    'unique:etudiants,email,' . $id
+                ],
+                'telephone' => [
+                    'sometimes',
+                    'string',
+                    'regex:/^(70|75|76|77|78)[0-9]{7}$/',
+                    'unique:etudiants,telephone,' . $id
+                ],
+                'chambre' => [
+                    'nullable',
+                    'string',
+                    'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                    'regex:/^(?!.*  ).*$/'
+                ],
+                'numero_de_dossier' => 'sometimes|integer|unique:etudiants,numero_de_dossier,' . $id,
+            ], [
+                'nom.regex' => 'Le nom ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+                'prenom.regex' => 'Le prénom ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+                'email.email' => 'L\'email doit être une adresse email valide.',
+                'email.regex' => 'Le format de l\'email est incorrect.',
+                'email.unique' => 'Cet email est déjà utilisé.',
+                'telephone.regex' => 'Le numéro de téléphone doit être de 9 chiffres et commencer par 70, 75, 76, 77 ou 78.',
+                'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
+                'chambre.regex' => 'La chambre ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+                'numero_de_dossier.integer' => 'Le numéro de dossier doit être un entier.',
+                'numero_de_dossier.unique' => 'Ce numéro de dossier est déjà utilisé.',
+            ]);
+
+            $etudiant->update($request->all());
+
+            return response()->json(['message' => 'Étudiant mis à jour avec succès', 'etudiant' => $etudiant], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    // Supprimer un étudiant
+    public function supprimerEtudiant($id): JsonResponse
+    {
+        try {
+            $etudiant = Etudiant::findOrFail($id);
+            $etudiant->delete();
+
+            return response()->json(['message' => 'Étudiant supprimé avec succès'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    // Bloquer un étudiant
+    public function bloquerEtudiant($id): JsonResponse
+    {
+        try {
+            $etudiant = Etudiant::findOrFail($id);
+
+            if ($etudiant->statut === 'active') {
+                $etudiant->statut = 'bloqué';
+                $etudiant->save();
+
+                return response()->json(['message' => 'Étudiant bloqué avec succès'], 200);
+            } else {
+                return response()->json(['message' => 'Étudiant déjà bloqué'], 200);
+            }
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    // Débloquer un étudiant
+    public function debloquerEtudiant($id): JsonResponse
+    {
+        try {
+            $etudiant = Etudiant::findOrFail($id);
+
+            if ($etudiant->statut === 'bloqué') {
+                $etudiant->statut = 'active';
+                $etudiant->save();
+
+                return response()->json(['message' => 'Étudiant débloqué avec succès'], 200);
+            } else {
+                return response()->json(['message' => 'Étudiant déjà actif'], 200);
+            }
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    public function changePassword(Request $request, $id): JsonResponse
+    {
+        $validatedData = $request->validate([
+            'nouveau_password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/[A-Z]/', // doit contenir au moins une lettre majuscule
+                'regex:/[a-z]/', // doit contenir au moins une lettre minuscule
+                'regex:/[0-9]/', // doit contenir au moins un chiffre
+                'regex:/[@$!%*?&]/' // doit contenir au moins un caractère spécial
+            ],
+        ], [
+            'nouveau_password.required' => 'Le nouveau mot de passe est obligatoire.',
+            'nouveau_password.min' => 'Le nouveau mot de passe doit contenir au moins 8 caractères.',
+            'nouveau_password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+            'nouveau_password.regex' => 'Le nouveau mot de passe doit contenir au moins une lettre majuscule, une lettre minuscule, un chiffre et un caractère spécial.',
+        ]);
+
+        try {
+            $etudiant = Etudiant::findOrFail($id);
+            $etudiant->mot_de_passe = $validatedData['nouveau_password'];
+            $etudiant->save();
+
+            return response()->json(['message' => 'Mot de passe changé avec succès']);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Utilisateur introuvable'], 404);
+        }
+    }
+
+    // Authentification
     public function login(Request $request)
     {
+        $request->validate([
+            'email' => [
+                'required',
+                'email',
+                'regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/'
+            ],
+            'password' => 'required|string|min:8',
+        ], [
+            'email.required' => 'L\'email est obligatoire.',
+            'email.email' => 'L\'email doit être une adresse email valide.',
+            'email.regex' => 'Le format de l\'email est incorrect.',
+            'password.required' => 'Le mot de passe est obligatoire.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+        ]);
+
         $credentials = $request->only('email', 'password');
 
         // Essayer de se connecter en tant qu'admin/vigile
         if (Auth::guard('admin_vigile')->attempt($credentials)) {
             $user = Auth::guard('admin_vigile')->user();
+
+            if ($user->statut === 'bloqué') {
+                return response()->json(['error' => 'Utilisateur bloqué'], 403);
+            }
+
             $token = $user->createToken('authToken')->plainTextToken;
 
             return response()->json([
@@ -112,6 +259,11 @@ public function registerAdmin(Request $request)
         // Essayer de se connecter en tant qu'étudiant
         if (Auth::guard('etudiant')->attempt($credentials)) {
             $user = Auth::guard('etudiant')->user();
+
+            if ($user->statut === 'bloqué') {
+                return response()->json(['error' => 'Utilisateur bloqué'], 403);
+            }
+
             $token = $user->createToken('authToken')->plainTextToken;
 
             return response()->json([
@@ -122,13 +274,13 @@ public function registerAdmin(Request $request)
         }
 
         // Si l'authentification échoue
-        return response()->json(['error' => 'Unauthorized'], 401);
+        return response()->json(['error' => 'L\'authentification a échoué'], 401);
     }
 
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Logged out']);
+        return response()->json(['message' => 'Deconnexion reussie']);
     }
 }

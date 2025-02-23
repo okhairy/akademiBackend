@@ -20,12 +20,15 @@ Route::delete('/etudiant/{id}', [AuthController::class, 'supprimerEtudiant']);
 Route::patch('/etudiant/bloquer/{id}', [AuthController::class, 'bloquerEtudiant']);
 Route::patch('/etudiant/debloquer/{id}', [AuthController::class, 'debloquerEtudiant']);
 Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePassword']);
+
 Route::post('/etudiant/depot/{id}', [AuthController::class, 'depot']);
 Route::post('/etudiant/retrait', [AuthController::class, 'retrait']);
 Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
-Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions']);
-Route::get('/transactions', [AuthController::class, 'getAllTransactions']);
-
+Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
+Route::get('/transactions', [AuthController::class, 'getAllTransactions'])->middleware('auth:sanctum');
+Route::get('/etudiant/week-depenses', [AuthController::class, 'getWeeklyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiant/month-depenses', [AuthController::class, 'getMonthlyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiant/last-depot', [AuthController::class, 'getLastDepositAndWeeklyExpenses'])->middleware('auth:sanctum');
 
 Route::get('/user', function (Request $request) {
     return $request->user(); 

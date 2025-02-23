@@ -422,13 +422,22 @@ class AuthController extends Controller
 
     public function getTransactions(Request $request): JsonResponse
     {
-        $etudiant = Auth::guard('etudiant')->user();
+        $etudiant = $request->user();
 
         if (!$etudiant) {
             return response()->json(['message' => 'Utilisateur non connecté'], 401);
         }
 
+        // Vérifier si l'utilisateur est un étudiant
+        if (!isset($etudiant->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
+
         $transactions = Transaction::where('id_etudiant', $etudiant->id)->get();
+
+        if ($transactions->isEmpty()) {
+            return response()->json(['message' => 'Aucune transaction pour le moment'], 200);
+        }
 
         return response()->json(['transactions' => $transactions], 200);
     }
@@ -442,5 +451,117 @@ class AuthController extends Controller
         }
 
         return response()->json(['transactions' => $transactions], 200);
+    }
+
+
+    public function getWeeklyExpenses(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur est un étudiant
+        // if (!isset($user->uid_carte)) {
+        //     return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        // }
+
+        $startDate = Carbon::now()->startOfWeek();
+        $endDate = Carbon::now()->endOfWeek();
+
+        $transactions = Transaction::where('id_etudiant', $user->id)
+            ->whereBetween('date', [$startDate, $endDate])
+            ->get();
+
+        $expenses = [];
+
+        for ($date = $startDate; $date->lte($endDate); $date->addDay()) {
+            $dailyTransactions = $transactions->where('date', $date->toDateString());
+
+            $petitDejeunerCount = $dailyTransactions->where('type', 'petit déjeuner')->count();
+            $dejeunerDinerCount = $dailyTransactions->whereIn('type', ['déjeuner', 'dîner'])->count();
+
+            $expenses[] = [
+                'date' => $date->toDateString(),
+                'petit_dejeuner' => $petitDejeunerCount,
+                'dejeuner_diner' => $dejeunerDinerCount,
+            ];
+        }
+
+        return response()->json(['expenses' => $expenses], 200);
+    }
+
+    public function getMonthlyExpenses(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur est un étudiant
+        // if (!isset($user->uid_carte)) {
+        //     return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        // }
+
+            $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->month;
+
+        $expenses = [];
+
+        for ($month = 1; $month <= $currentMonth; $month++) {
+            $startDate = Carbon::create($currentYear, $month, 1)->startOfMonth();
+            $endDate = Carbon::create($currentYear, $month, 1)->endOfMonth();
+
+            $transactions = Transaction::where('id_etudiant', $user->id)
+                ->whereBetween('date', [$startDate, $endDate])
+                ->get();
+
+            $petitDejeunerCount = $transactions->where('type', 'petit déjeuner')->count();
+            $dejeunerDinerCount = $transactions->whereIn('type', ['déjeuner', 'dîner'])->count();
+
+            $expenses[] = [
+                'mois' => $startDate->format('F'),
+                'petit_dejeuner' => $petitDejeunerCount,
+                'dejeuner_diner' => $dejeunerDinerCount,
+            ];
+        }
+
+        return response()->json(['expenses' => $expenses], 200);
+    }
+
+    public function getLastDepositAndWeeklyExpenses(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur est un étudiant
+        // if (!isset($user->uid_carte)) {
+        //     return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        // }
+
+        // Récupérer le dernier dépôt
+        $lastDeposit = Transaction::where('id_etudiant', $user->id)
+            ->where('type', 'dépot')
+            ->orderBy('date', 'desc')
+            ->value('montant');
+
+        // Calculer la somme des dépenses de la semaine en cours
+        $startDate = Carbon::now()->startOfWeek();
+        $endDate = Carbon::now()->endOfWeek();
+
+        $weeklyExpenses = Transaction::where('id_etudiant', $user->id)
+            ->whereBetween('date', [$startDate, $endDate])
+            ->whereIn('type', ['petit déjeuner', 'déjeuner', 'dîner'])
+            ->sum('montant');
+
+        return response()->json([
+            'Dernier_depot' => $lastDeposit,
+            'Depenses_dans_la_semaine' => $weeklyExpenses,
+        ], 200);
     }
 }

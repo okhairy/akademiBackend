@@ -8,6 +8,8 @@ use App\Models\AdminVigile;
 use App\Models\Etudiant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Models\Transaction;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -282,5 +284,163 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Deconnexion reussie']);
+    }
+
+
+    public function depot(Request $request, $id): JsonResponse
+    {
+        $request->validate([
+            'montant' => 'required|integer|min:50',
+            'operateur' => 'required|in:wave,orange,free',
+        ], [
+            'montant.required' => 'Le montant est obligatoire.',
+            'montant.integer' => 'Le montant doit être un entier.',
+            'montant.min' => 'Le montant doit être au moins 1.',
+            'operateur.required' => 'L\'opérateur est obligatoire.',
+            'operateur.in' => 'L\'opérateur doit être wave, orange ou free.',
+        ]);
+
+        try {
+            $etudiant = Etudiant::findOrFail($id);
+
+            // Vérifier si l'étudiant a un uid_carte
+            if (empty($etudiant->uid_carte)) {
+                return response()->json(['message' => 'Désolé, Veuillez disposer d\'une carte s\'il vous plait'], 400);
+            }
+
+            // Incrémenter le solde de l'étudiant
+            $etudiant->solde += $request->montant;
+            $etudiant->save();
+
+            // Enregistrer la transaction
+            $transaction = Transaction::create([
+                'date' => now(),
+                'montant' => $request->montant,
+                'type' => 'dépot',
+                'operateur' => $request->operateur,
+                'id_etudiant' => $etudiant->id,
+            ]);
+
+            return response()->json(['message' => 'Dépôt effectué avec succès', 'transaction' => $transaction], 201);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+
+    public function retrait(Request $request): JsonResponse
+    {
+        $request->validate([
+            'uid_carte' => 'required|string',
+        ], [
+            'uid_carte.required' => 'Le uid_carte est obligatoire.',
+        ]);
+        try {
+            $etudiant = Etudiant::where('uid_carte', $request->uid_carte)->firstOrFail();
+
+            // Vérifier si l'étudiant n'est pas bloqué
+            if ($etudiant->statut === 'bloqué') {
+                return response()->json(['message' => 'Étudiant bloqué'], 403);
+            }
+
+            // Vérifier si la carte n'est pas bloquée
+            if ($etudiant->status_carte === 'bloqué') {
+                return response()->json(['message' => 'Accès refusé: Carte bloquée'], 403);
+            }
+
+            $currentTime = Carbon::now();
+            $currentHour = $currentTime->hour;
+            $currentMinute = $currentTime->minute;
+
+            $montant = 0;
+            $type = '';
+
+            if (($currentHour == 9 && $currentMinute >= 0) || ($currentHour == 11 && $currentMinute <= 30) || ($currentHour > 9 && $currentHour < 11)) {
+                $montant = 50;
+                $type = 'petit déjeuner';
+            } elseif (($currentHour == 12 && $currentMinute >= 0) || ($currentHour == 14 && $currentMinute <= 0) || ($currentHour > 12 && $currentHour < 14)) {
+                $montant = 100;
+                $type = 'déjeuner';
+            } elseif (($currentHour == 19 && $currentMinute >= 0) || ($currentHour == 1 && $currentMinute <= 0) || ($currentHour > 19 || $currentHour < 1)) {
+                $montant = 100;
+                $type = 'dîner';
+            } else {
+                return response()->json(['message' => 'Retrait non autorisé à cette heure'], 400);
+            }
+
+            // Vérifier si l'étudiant a suffisamment de solde
+            if ($etudiant->solde < $montant) {
+                return response()->json(['message' => 'Solde insuffisant'], 400);
+            }
+
+            // Débiter le solde de l'étudiant
+            $etudiant->solde -= $montant;
+            $etudiant->save();
+
+            // Enregistrer la transaction
+            $transaction = Transaction::create([
+                'date' => now(),
+                'montant' => $montant,
+                'type' => $type,
+                'operateur' => null,
+                'id_etudiant' => $etudiant->id,
+            ]);
+
+            return response()->json(['message' => 'Retrait effectué avec succès', 'transaction' => $transaction], 201);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Carte invalide'], 404);
+        }
+    }
+
+    // Accès au campus
+    public function accesCampus(Request $request): JsonResponse
+    {
+        $request->validate([
+            'uid_carte' => 'required|string',
+        ], [
+            'uid_carte.required' => 'Le uid_carte est obligatoire.',
+        ]);
+
+        try {
+            $etudiant = Etudiant::where('uid_carte', $request->uid_carte)->firstOrFail();
+
+            // Vérifier si l'étudiant n'est pas bloqué
+            if ($etudiant->statut === 'bloqué') {
+                return response()->json(['message' => 'Accès refusé : Étudiant bloqué'], 403);
+            }
+
+            // Vérifier si la carte n'est pas bloquée
+            if ($etudiant->status_carte === 'bloqué') {
+                return response()->json(['message' => 'Carte bloquée'], 403);
+            }
+
+            return response()->json(['message' => 'Accès autorisé'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Carte invalide'], 404);
+        }
+    }
+
+    public function getTransactions(Request $request): JsonResponse
+    {
+        $etudiant = Auth::guard('etudiant')->user();
+
+        if (!$etudiant) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        $transactions = Transaction::where('id_etudiant', $etudiant->id)->get();
+
+        return response()->json(['transactions' => $transactions], 200);
+    }
+
+    public function getAllTransactions(): JsonResponse
+    {
+        $transactions = Transaction::all();
+
+        if ($transactions->isEmpty()) {
+            return response()->json(['message' => 'Aucune transaction pour le moment'], 200);
+        }
+
+        return response()->json(['transactions' => $transactions], 200);
     }
 }

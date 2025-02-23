@@ -32,3 +32,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
 Route::post('/register/etudiant', [AuthController::class, 'registerEtudiant']);
+//route pour assigner une carte
+Route::put('/etudiants/{id}/assigner-carte', [AuthController::class, 'assignerCarte']);
+// Désassigner une carte d'un étudiant
+Route::delete('/etudiants/{id}/desassigner-carte', [AuthController::class, 'desassignerCarte']);
+
+

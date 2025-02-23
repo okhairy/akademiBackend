@@ -283,4 +283,77 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Deconnexion reussie']);
     }
+     /**
+     * Assigner une carte RFID à un étudiant
+     */
+  
+    /**
+     * Assigner une carte à un étudiant.
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function assignerCarte(Request $request, $id)
+    {
+        // Validation des données
+        $request->validate([
+            'uid_carte' => 'required|string|unique:etudiants,uid_carte', // UID de la carte doit être unique
+            'status_carte' => 'required|string|in:bloqué,débloqué', // Statut doit être "bloqué" ou "débloqué"
+        ]);
+
+        // Trouver l'étudiant par son ID
+        $etudiant = Etudiant::find($id);
+
+        // Vérifier si l'étudiant existe
+        if (!$etudiant) {
+            return response()->json(['message' => 'Étudiant non trouvé'], 404);
+        }
+
+        // Mettre à jour l'UID de la carte et le statut
+        $etudiant->update([
+            'uid_carte' => $request->uid_carte,
+            'status_carte' => $request->status_carte,
+        ]);
+
+        // Réponse JSON en cas de succès
+        return response()->json([
+            'message' => 'Carte assignée avec succès',
+            'etudiant' => $etudiant
+        ], 200);
+    }
+     /**
+     * Désassigner une carte d'un étudiant.
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function desassignerCarte($id)
+    {
+        // Trouver l'étudiant par son ID
+        $etudiant = Etudiant::find($id);
+
+        // Vérifier si l'étudiant existe
+        if (!$etudiant) {
+            return response()->json(['message' => 'Étudiant non trouvé'], 404);
+        }
+
+        // Vérifier si l'étudiant a déjà une carte assignée
+        if (!$etudiant->uid_carte) {
+            return response()->json(['message' => 'Aucune carte assignée à cet étudiant'], 400);
+        }
+
+        // Réinitialiser l'UID de la carte et le statut
+        $etudiant->update([
+            'uid_carte' => null,
+            'status_carte' => null,
+        ]);
+
+        // Réponse JSON en cas de succès
+        return response()->json([
+            'message' => 'Carte désassignée avec succès',
+            'etudiant' => $etudiant
+        ], 200);
+    }
+
 }

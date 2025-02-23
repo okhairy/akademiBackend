@@ -22,7 +22,8 @@ return new class extends Migration
             $table->string('photo')->nullable();
             $table->string('mot_de_passe')->default(Hash::make('passer123')); // Mot de passe par défaut
             $table->enum('statut', ['active', 'bloqué'])->default('active');
-            $table->date('date_de_creation');
+            $table->date('date_de_creation')->default(now());
+
             $table->integer('numero_de_dossier')->unique();
             $table->string('uid_carte')->unique()->nullable();
             $table->enum('status_carte', ['bloqué', 'débloqué'])->nullable();

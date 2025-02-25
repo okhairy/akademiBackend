@@ -10,6 +10,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Models\Transaction;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
+use App\Mail\BienvenueEmail;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -66,6 +69,9 @@ class AuthController extends Controller
             'numero_de_dossier.unique' => 'Ce numéro de dossier est déjà utilisé.',
         ]);
 
+        // Générer un mot de passe fort
+        $password = Str::random(8);  // Génération d'un mot de passe de 8 caractères
+
         $etudiant = Etudiant::create([
             'nom' => $request->nom,
             'prenom' => $request->prenom,
@@ -74,7 +80,19 @@ class AuthController extends Controller
             'chambre' => $request->chambre,
             'numero_de_dossier' => $request->numero_de_dossier,
             'statut' => 'active', // Statut par défaut
+            'mot_de_passe' => $password,
         ]);
+
+         // Données pour l'email
+         $details = [
+            'nom' => $etudiant->nom,
+            'prenom' => $etudiant->prenom,
+            'email' => $etudiant->email,
+            'mot_de_passe' => $password // Affichage en clair pour l'email
+        ];
+
+        // Envoi de l'email de bienvenue
+        Mail::to($etudiant->email)->send(new BienvenueEmail($details));
 
         return response()->json(['message' => 'Étudiant créé avec succès', 'etudiant' => $etudiant], 201);
     }
@@ -295,7 +313,7 @@ class AuthController extends Controller
         ], [
             'montant.required' => 'Le montant est obligatoire.',
             'montant.integer' => 'Le montant doit être un entier.',
-            'montant.min' => 'Le montant doit être au moins 1.',
+            'montant.min' => 'Le montant doit être au moins 50.',
             'operateur.required' => 'L\'opérateur est obligatoire.',
             'operateur.in' => 'L\'opérateur doit être wave, orange ou free.',
         ]);
@@ -333,7 +351,7 @@ class AuthController extends Controller
         $request->validate([
             'uid_carte' => 'required|string',
         ], [
-            'uid_carte.required' => 'Le uid_carte est obligatoire.',
+            'uid_carte.required' => 'Le numéro carte est obligatoire.',
         ]);
         try {
             $etudiant = Etudiant::where('uid_carte', $request->uid_carte)->firstOrFail();
@@ -355,13 +373,13 @@ class AuthController extends Controller
             $montant = 0;
             $type = '';
 
-            if (($currentHour == 9 && $currentMinute >= 0) || ($currentHour == 11 && $currentMinute <= 30) || ($currentHour > 9 && $currentHour < 11)) {
+            if (($currentHour == 6 && $currentMinute >= 0) || ($currentHour == 11 && $currentMinute <= 30) || ($currentHour > 9 && $currentHour < 11)) {
                 $montant = 50;
                 $type = 'petit déjeuner';
-            } elseif (($currentHour == 12 && $currentMinute >= 0) || ($currentHour == 14 && $currentMinute <= 0) || ($currentHour > 12 && $currentHour < 14)) {
+            } elseif (($currentHour == 12 && $currentMinute >= 0) || ($currentHour == 15 && $currentMinute <= 0) || ($currentHour > 12 && $currentHour < 14)) {
                 $montant = 100;
                 $type = 'déjeuner';
-            } elseif (($currentHour == 19 && $currentMinute >= 0) || ($currentHour == 1 && $currentMinute <= 0) || ($currentHour > 19 || $currentHour < 1)) {
+            } elseif (($currentHour == 19 && $currentMinute >= 0) || ($currentHour == 22 && $currentMinute <= 0) || ($currentHour > 19 || $currentHour < 1)) {
                 $montant = 100;
                 $type = 'dîner';
             } else {
@@ -442,8 +460,15 @@ class AuthController extends Controller
         return response()->json(['transactions' => $transactions], 200);
     }
 
-    public function getAllTransactions(): JsonResponse
+    public function getAllTransactions(Request $request): JsonResponse
     {
+        $user = $request->user(); // Récupérer l'utilisateur connecté
+
+        // Vérifier si l'utilisateur est un administrateur
+        if (!$user || $user->role !== 'admin') {
+            return response()->json(['message' => 'Accès refusé'], 403);
+        }
+        
         $transactions = Transaction::all();
 
         if ($transactions->isEmpty()) {
@@ -462,10 +487,10 @@ class AuthController extends Controller
             return response()->json(['message' => 'Utilisateur non connecté'], 401);
         }
 
-        // Vérifier si l'utilisateur est un étudiant
-        // if (!isset($user->uid_carte)) {
-        //     return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
-        // }
+        //Vérifier si l'utilisateur est un étudiant
+        if (!isset($user->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
 
         $startDate = Carbon::now()->startOfWeek();
         $endDate = Carbon::now()->endOfWeek();
@@ -540,9 +565,9 @@ class AuthController extends Controller
         }
 
         // Vérifier si l'utilisateur est un étudiant
-        // if (!isset($user->uid_carte)) {
-        //     return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
-        // }
+        if (!isset($user->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
 
         // Récupérer le dernier dépôt
         $lastDeposit = Transaction::where('id_etudiant', $user->id)
@@ -564,4 +589,243 @@ class AuthController extends Controller
             'Depenses_dans_la_semaine' => $weeklyExpenses,
         ], 200);
     }
+     /**
+     * Assigner une carte RFID à un étudiant
+     */
+  
+    /**
+     * Assigner une carte à un étudiant.
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function assignerCarte(Request $request, $id)
+    {
+        // Validation des données
+        $request->validate([
+            'uid_carte' => 'required|string|unique:etudiants,uid_carte', // UID de la carte doit être unique
+        ]);
+
+        // Trouver l'étudiant par son ID
+        $etudiant = Etudiant::find($id);
+
+        // Vérifier si l'étudiant existe
+        if (!$etudiant) {
+            return response()->json(['message' => 'Étudiant non trouvé'], 404);
+        }
+
+        // Mettre à jour l'UID de la carte et le statut
+        $etudiant->update([
+            'uid_carte' => $request->uid_carte,
+            'status_carte' => 'débloqué',
+        ]);
+
+        // Réponse JSON en cas de succès
+        return response()->json([
+            'message' => 'Carte assignée avec succès',
+            'etudiant' => $etudiant
+        ], 200);
+    }
+     /**
+     * Désassigner une carte d'un étudiant.
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function desassignerCarte($id)
+    {
+        // Trouver l'étudiant par son ID
+        $etudiant = Etudiant::find($id);
+
+        // Vérifier si l'étudiant existe
+        if (!$etudiant) {
+            return response()->json(['message' => 'Étudiant non trouvé'], 404);
+        }
+
+        // Vérifier si l'étudiant a déjà une carte assignée
+        if (!$etudiant->uid_carte) {
+            return response()->json(['message' => 'Aucune carte assignée à cet étudiant'], 400);
+        }
+
+        // Réinitialiser l'UID de la carte et le statut
+        $etudiant->update([
+            'uid_carte' => null,
+            'status_carte' => null,
+        ]);
+
+        // Réponse JSON en cas de succès
+        return response()->json([
+            'message' => 'Carte désassignée avec succès',
+            'etudiant' => $etudiant
+        ], 200);
+    }
+    /**
+     * Mettre à jour la photo d'un étudiant.
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updatePhoto(Request $request): JsonResponse
+    {
+        $etudiant = $request->user();
+
+        if (!$etudiant) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur est un étudiant
+        if (!isset($etudiant->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
+        
+        $request->validate([
+            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ], [
+            'photo.required' => 'La photo est obligatoire.',
+            'photo.image' => 'Le fichier doit être une image.',
+            'photo.mimes' => 'La photo doit être un fichier de type: jpeg, png, jpg, gif.',
+            'photo.max' => 'La photo ne doit pas dépasser 2 Mo.',
+        ]);
+
+        try {
+            // Stocker la nouvelle photo
+            $photoPath = $request->file('photo')->store('photos', 'public');
+
+            // Mettre à jour le chemin de la photo dans la base de données
+            $etudiant->photo = $photoPath;
+            $etudiant->save();
+
+            return response()->json(['message' => 'Photo mise à jour avec succès', 'photo' => $photoPath], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    /**
+     * Bloquer la carte d'un étudiant.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function bloquerCarte(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur est un étudiant
+        if (!isset($user->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
+
+        try {
+            $etudiant = Etudiant::findOrFail($user->id);
+
+            // Vérifier si la carte est déjà bloquée
+            if ($etudiant->status_carte === 'bloqué') {
+                return response()->json(['message' => 'Carte déjà bloquée'], 200);
+            }
+
+            // Bloquer la carte
+            $etudiant->status_carte = 'bloqué';
+            $etudiant->save();
+
+            return response()->json(['message' => 'Carte bloquée avec succès'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    /**
+     * Débloquer la carte d'un étudiant.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function debloquerCarte(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur est un étudiant
+        if (!isset($user->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
+
+        try {
+            $etudiant = Etudiant::findOrFail($user->id);
+
+            // Vérifier si la carte est déjà débloquée
+            if ($etudiant->status_carte === 'débloqué') {
+                return response()->json(['message' => 'Carte déjà débloquée'], 200);
+            }
+
+            // Débloquer la carte
+            $etudiant->status_carte = 'débloqué';
+            $etudiant->save();
+
+            return response()->json(['message' => 'Carte débloquée avec succès'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    /**
+     * Récupérer un étudiant par son ID.
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getEtudiantById(Request $request, $id): JsonResponse
+    {
+        $user = $request->user();
+
+        // Vérifier si l'utilisateur est authentifié
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur a le droit d'accéder à ces informations (ex: admin)
+        if ($user->role !== 'admin') {
+            return response()->json(['message' => 'Accès refusé'], 403);
+        }
+
+        try {
+            $etudiant = Etudiant::findOrFail($id);
+            return response()->json(['etudiant' => $etudiant], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    /**
+     * Récupérer tous les étudiants.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getAllEtudiants(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Vérifier si l'utilisateur est authentifié
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur a le droit d'accéder à ces informations (ex: admin)
+        if ($user->role !== 'admin') {
+            return response()->json(['message' => 'Accès refusé'], 403);
+        }
+
+        $etudiants = Etudiant::all();
+        return response()->json(['etudiants' => $etudiants], 200);
+    }
+
 }

@@ -14,18 +14,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/admin-vigiles/{id}', [AdminVigileController::class, 'destroy']); // Supprimer un Admin/Vigile
     Route::patch('/admin-vigiles/bloquer/{id}', [AdminVigileController::class, 'bloquer']); // Bloquer un Admin/Vigile
     Route::patch('/admin-vigiles/debloquer/{id}', [AdminVigileController::class, 'debloquer']); // Débloquer un Admin/Vigile
-    Route::patch('/admin-vigiles/change-pwd/{id}', [AdminVigileController::class, 'changePassword']);
+    Route::put('/etudiants/{id}/assigner-carte', [AuthController::class, 'assignerCarte']); // Assigner une carte à un étudiant
+    Route::delete('/etudiants/{id}/desassigner-carte', [AuthController::class, 'desassignerCarte']);
 
     // Étudiant routes
+    Route::post('/register/etudiant', [AuthController::class, 'registerEtudiant']);
     Route::put('/etudiant/{id}', [AuthController::class, 'updateEtudiant']);
     Route::delete('/etudiant/{id}', [AuthController::class, 'supprimerEtudiant']);
+    Route::get('/etudiant/{id}', [AuthController::class, 'getEtudiantById']);
+    Route::get('/etudiants', [AuthController::class, 'getAllEtudiants']);
     Route::patch('/etudiant/bloquer/{id}', [AuthController::class, 'bloquerEtudiant']);
     Route::patch('/etudiant/debloquer/{id}', [AuthController::class, 'debloquerEtudiant']);
-    Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePassword']);
+    Route::patch('/etudiant/photo', [AuthController::class, 'updatePhoto']);
 
     Route::post('/etudiant/depot/{id}', [AuthController::class, 'depot']);
     Route::post('/etudiant/retrait', [AuthController::class, 'retrait']);
     Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
+    Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte']);
+    Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte']);
 });
 Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
 Route::get('/transactions', [AuthController::class, 'getAllTransactions'])->middleware('auth:sanctum');
@@ -37,9 +43,15 @@ Route::get('/user', function (Request $request) {
     return $request->user(); 
 })->middleware('auth:sanctum');
 
+Route::patch('/admin-vigiles/change-pwd/{id}', [AdminVigileController::class, 'changePassword']);
+Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePassword']);
 
 // Authentification
 Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+Route::post('/envoyer-email', [AdminVigileController::class, 'sendEmail']);
 
-Route::post('/register/etudiant', [AuthController::class, 'registerEtudiant']);
+
+
+
+

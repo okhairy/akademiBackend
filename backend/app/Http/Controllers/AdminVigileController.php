@@ -7,10 +7,28 @@ use App\Models\AdminVigile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Mail\MonEmail;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\BienvenueEmail;
+use Illuminate\Support\Str;
 
 
 class AdminVigileController extends Controller
 {
+    public function sendEmail(Request $request)
+    {
+        // Les données à injecter dans l'email
+        $details = [
+            'titre' => 'Salut depuis Laravel',
+            'message' => 'Voici un message envoyé depuis Gmail SMTP !'
+        ];
+
+        // Envoi de l'email
+        Mail::to('asow19133@gmail.com')->send(new MonEmail($details));
+
+        return response()->json(['message' => 'Email envoyé avec succès !']);
+    }
+
     /**
      * Afficher la liste des Admins/Vigiles
      */
@@ -71,9 +89,30 @@ class AdminVigileController extends Controller
             'role.in' => 'Le rôle doit être soit "admin" soit "vigile".'
         ]);
 
+        // Générer un mot de passe fort de 8 caractères
+        $plainPassword = Str::random(8); // Générer un mot de passe aléatoire
+            // Créer l'Admin Vigile et hacher le mot de passe
+        $adminVigile = AdminVigile::create([
+            'nom' => $validatedData['nom'],
+            'prenom' => $validatedData['prenom'],
+            'email' => $validatedData['email'],
+            'telephone' => $validatedData['telephone'],
+            'mot_de_passe' => $plainPassword, // Hacher le mot de passe avant de le stocker
+            'statut' => 'active',
+            'role' => $validatedData['role'],
+            'date_de_creation' => now(), // Si tu veux ajouter un timestamp
+        ]);
 
-        $adminVigile = AdminVigile::create($validatedData);
+            // Données pour l'email
+            $details = [
+                'nom' => $adminVigile->nom,
+                'prenom' => $adminVigile->prenom,
+                'email' => $adminVigile->email,
+                'mot_de_passe' => $plainPassword // Affichage en clair pour l'email
+            ];
 
+            // Envoi de l'email de bienvenue
+            Mail::to($adminVigile->email)->send(new BienvenueEmail($details));
         return response()->json($adminVigile, 201);
     }
 

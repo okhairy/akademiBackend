@@ -12,6 +12,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 
 
+
 class AdminVigile extends Authenticatable
 {
     use HasFactory;
@@ -47,9 +48,6 @@ class AdminVigile extends Authenticatable
 
         // Événement "creating" pour définir le mot de passe par défaut
         static::creating(function ($adminVigile) {
-            if (empty($adminVigile->mot_de_passe)) {
-                $adminVigile->mot_de_passe = 'passer123';
-            }
             $adminVigile->mot_de_passe = Hash::make($adminVigile->mot_de_passe);
         });
     }

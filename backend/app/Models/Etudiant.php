@@ -28,9 +28,6 @@ class Etudiant extends Authenticatable
 
         // Événement "creating" pour définir le mot de passe par défaut
         static::creating(function ($etudiant) {
-            if (empty($etudiant->mot_de_passe)) {
-                $etudiant->mot_de_passe = 'passer123';
-            }
             $etudiant->mot_de_passe = Hash::make($etudiant->mot_de_passe);
         });
     }

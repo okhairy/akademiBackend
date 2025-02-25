@@ -11,6 +11,8 @@ use App\Mail\MonEmail;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\BienvenueEmail;
 use Illuminate\Support\Str;
+use libphonenumber\PhoneNumberUtil;
+use libphonenumber\PhoneNumberFormat;
 
 
 class AdminVigileController extends Controller
@@ -48,6 +50,8 @@ class AdminVigileController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $phoneUtil = PhoneNumberUtil::getInstance();
+
         $validatedData = $request->validate([
             'nom' => [
             'required',
@@ -65,7 +69,16 @@ class AdminVigileController extends Controller
             'telephone' => [
                 'required',
                 'string',
-                'regex:/^(70|75|76|77|78)[0-9]{7}$/',
+                function ($attribute, $value, $fail) use ($phoneUtil) {
+                    try {
+                        $number = $phoneUtil->parse($value, null); // Détection automatique du pays
+                        if (!$phoneUtil->isValidNumber($number)) {
+                            $fail("Le numéro de téléphone n'est pas valide.");
+                        }
+                    } catch (\Exception $e) {
+                        $fail("Format du numéro invalide.");
+                    }
+                },
                 'unique:admin_vigiles'
             ],
             'mot_de_passe' => 'string|min:8',
@@ -80,7 +93,6 @@ class AdminVigileController extends Controller
             'email.email' => 'L\'email doit être une adresse email valide.',
             'email.unique' => 'Cet email est déjà utilisé.',
             'telephone.required' => 'Le numéro de téléphone est obligatoire.',
-            'telephone.regex' => 'Le numéro de téléphone doit être de 9 chiffres et commencer par 70, 75, 76, 77 ou 78.',
             'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
             'mot_de_passe.required' => 'Le mot de passe est obligatoire.',
             'mot_de_passe.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
@@ -135,6 +147,7 @@ class AdminVigileController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         $adminVigile = AdminVigile::findOrFail($id);
+        $phoneUtil = PhoneNumberUtil::getInstance();
 
         $validatedData = $request->validate([
             'nom' => [
@@ -153,7 +166,16 @@ class AdminVigileController extends Controller
             'telephone' => [
                 'sometimes',
                 'string',
-                'regex:/^(70|75|76|77|78)[0-9]{7}$/',
+                function ($attribute, $value, $fail) use ($phoneUtil) {
+                    try {
+                        $number = $phoneUtil->parse($value, null); // Détection automatique du pays
+                        if (!$phoneUtil->isValidNumber($number)) {
+                            $fail("Le numéro de téléphone n'est pas valide.");
+                        }
+                    } catch (\Exception $e) {
+                        $fail("Format du numéro invalide.");
+                    }
+                },
                 'unique:admin_vigiles,telephone,' . $id
             ],
             'statut' => 'sometimes|in:active,bloqué',
@@ -163,7 +185,6 @@ class AdminVigileController extends Controller
             'prenom.regex' => 'Le prénom ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
             'email.email' => 'L\'email doit être une adresse email valide.',
             'email.unique' => 'Cet email est déjà utilisé.',
-            'telephone.regex' => 'Le numéro de téléphone doit être de 9 chiffres et commencer par 70, 75, 76, 77 ou 78.',
             'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
             'statut.in' => 'Le statut doit être soit "active" soit "bloqué".',
             'role.in' => 'Le rôle doit être soit "admin" soit "vigile".'
@@ -188,6 +209,25 @@ class AdminVigileController extends Controller
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Utilisateur introuvable'], 404);
         }
+    }
+
+    public function supprimerPlusieursAdminVigiles(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:admin_vigiles,id',
+        ], [
+            'ids.required' => 'Les IDs des Admins/Vigiles sont obligatoires.',
+            'ids.array' => 'Les IDs doivent être un tableau.',
+            'ids.*.integer' => 'Chaque ID doit être un entier.',
+            'ids.*.exists' => 'Chaque ID doit exister dans la base de données.',
+        ]);
+
+        $ids = $request->input('ids');
+
+        AdminVigile::whereIn('id', $ids)->delete();
+
+        return response()->json(['message' => 'Admins/Vigiles supprimés avec succès'], 200);
     }
 
     /**

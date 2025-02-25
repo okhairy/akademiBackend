@@ -13,12 +13,15 @@ use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Mail\BienvenueEmail;
 use Illuminate\Support\Facades\Mail;
+use libphonenumber\PhoneNumberUtil;
+use libphonenumber\PhoneNumberFormat;
 
 class AuthController extends Controller
 {
     // Inscription d'un étudiant
     public function registerEtudiant(Request $request)
     {
+        $phoneUtil = PhoneNumberUtil::getInstance();
         $request->validate([
             'nom' => [
                 'required',
@@ -41,7 +44,16 @@ class AuthController extends Controller
             'telephone' => [
                 'required',
                 'string',
-                'regex:/^(70|75|76|77|78)[0-9]{7}$/',
+                function ($attribute, $value, $fail) use ($phoneUtil) {
+                    try {
+                        $number = $phoneUtil->parse($value, null); // Détection automatique du pays
+                        if (!$phoneUtil->isValidNumber($number)) {
+                            $fail("Le numéro de téléphone n'est pas valide.");
+                        }
+                    } catch (\Exception $e) {
+                        $fail("Format du numéro invalide.");
+                    }
+                },
                 'unique:etudiants,telephone'
             ],
             'chambre' => [
@@ -61,7 +73,6 @@ class AuthController extends Controller
             'email.regex' => 'Le format de l\'email est incorrect.',
             'email.unique' => 'Cet email est déjà utilisé.',
             'telephone.required' => 'Le numéro de téléphone est obligatoire.',
-            'telephone.regex' => 'Le numéro de téléphone doit être de 9 chiffres et commencer par 70, 75, 76, 77 ou 78.',
             'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
             'chambre.regex' => 'La chambre ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
             'numero_de_dossier.required' => 'Le numéro de dossier est obligatoire.',
@@ -101,6 +112,7 @@ class AuthController extends Controller
     public function updateEtudiant(Request $request, $id)
     {
         try {
+            $phoneUtil = PhoneNumberUtil::getInstance();
             
             $etudiant = Etudiant::findOrFail($id);
 
@@ -126,7 +138,16 @@ class AuthController extends Controller
                 'telephone' => [
                     'sometimes',
                     'string',
-                    'regex:/^(70|75|76|77|78)[0-9]{7}$/',
+                    function ($attribute, $value, $fail) use ($phoneUtil) {
+                        try {
+                            $number = $phoneUtil->parse($value, null); // Détection automatique du pays
+                            if (!$phoneUtil->isValidNumber($number)) {
+                                $fail("Le numéro de téléphone n'est pas valide.");
+                            }
+                        } catch (\Exception $e) {
+                            $fail("Format du numéro invalide.");
+                        }
+                    },
                     'unique:etudiants,telephone,' . $id
                 ],
                 'chambre' => [
@@ -142,7 +163,6 @@ class AuthController extends Controller
                 'email.email' => 'L\'email doit être une adresse email valide.',
                 'email.regex' => 'Le format de l\'email est incorrect.',
                 'email.unique' => 'Cet email est déjà utilisé.',
-                'telephone.regex' => 'Le numéro de téléphone doit être de 9 chiffres et commencer par 70, 75, 76, 77 ou 78.',
                 'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
                 'chambre.regex' => 'La chambre ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
                 'numero_de_dossier.integer' => 'Le numéro de dossier doit être un entier.',
@@ -308,7 +328,16 @@ class AuthController extends Controller
     public function depot(Request $request, $id): JsonResponse
     {
         $request->validate([
-            'montant' => 'required|integer|min:50',
+            'montant' => [
+            'required',
+            'integer',
+            'min:50',
+            function ($attribute, $value, $fail) {
+                if ($value % 50 !== 0) {
+                    $fail('Le montant doit être un multiple de 50.');
+                }
+            },
+        ],
             'operateur' => 'required|in:wave,orange,free',
         ], [
             'montant.required' => 'Le montant est obligatoire.',
@@ -376,14 +405,10 @@ class AuthController extends Controller
             if (($currentHour == 6 && $currentMinute >= 0) || ($currentHour == 11 && $currentMinute <= 30) || ($currentHour > 9 && $currentHour < 11)) {
                 $montant = 50;
                 $type = 'petit déjeuner';
-            } elseif (($currentHour == 12 && $currentMinute >= 0) || ($currentHour == 15 && $currentMinute <= 0) || ($currentHour > 12 && $currentHour < 14)) {
+            
+            } else {
                 $montant = 100;
                 $type = 'déjeuner';
-            } elseif (($currentHour == 19 && $currentMinute >= 0) || ($currentHour == 22 && $currentMinute <= 0) || ($currentHour > 19 || $currentHour < 1)) {
-                $montant = 100;
-                $type = 'dîner';
-            } else {
-                return response()->json(['message' => 'Retrait non autorisé à cette heure'], 400);
             }
 
             // Vérifier si l'étudiant a suffisamment de solde
@@ -826,6 +851,79 @@ class AuthController extends Controller
 
         $etudiants = Etudiant::all();
         return response()->json(['etudiants' => $etudiants], 200);
+    }
+
+
+    /**
+     * Changer le mot de passe de l'utilisateur connecté.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function changePwd(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        $validatedData = $request->validate([
+            'ancien_password' => 'required|string',
+            'nouveau_password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/[A-Z]/', // doit contenir au moins une lettre majuscule
+                'regex:/[a-z]/', // doit contenir au moins une lettre minuscule
+                'regex:/[0-9]/', // doit contenir au moins un chiffre
+                'regex:/[@$!%*?&]/' // doit contenir au moins un caractère spécial
+            ],
+        ], [
+            'ancien_password.required' => 'L\'ancien mot de passe est obligatoire.',
+            'nouveau_password.required' => 'Le nouveau mot de passe est obligatoire.',
+            'nouveau_password.min' => 'Le nouveau mot de passe doit contenir au moins 8 caractères.',
+            'nouveau_password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+            'nouveau_password.regex' => 'Le nouveau mot de passe doit contenir au moins une lettre majuscule, une lettre minuscule, un chiffre et un caractère spécial.',
+        ]);
+
+        // Vérifier si l'ancien mot de passe est correct
+        if (!Hash::check($validatedData['ancien_password'], $user->mot_de_passe)) {
+            return response()->json(['message' => 'L\'ancien mot de passe est incorrect'], 400);
+        }
+
+        // Mettre à jour le mot de passe
+        $user->mot_de_passe = Hash::make($validatedData['nouveau_password']);
+        $user->save();
+
+        return response()->json(['message' => 'Mot de passe changé avec succès'], 200);
+    }
+
+
+    /**
+     * Supprimer plusieurs étudiants.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function supprimerPlusieursEtudiants(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:etudiants,id',
+        ], [
+            'ids.required' => 'Les IDs des étudiants sont obligatoires.',
+            'ids.array' => 'Les IDs doivent être un tableau.',
+            'ids.*.integer' => 'Chaque ID doit être un entier.',
+            'ids.*.exists' => 'Chaque ID doit exister dans la base de données.',
+        ]);
+
+        $ids = $request->input('ids');
+
+        Etudiant::whereIn('id', $ids)->delete();
+
+        return response()->json(['message' => 'Étudiants supprimés avec succès'], 200);
     }
 
 }

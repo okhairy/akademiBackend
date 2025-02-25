@@ -14,8 +14,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/admin-vigiles/{id}', [AdminVigileController::class, 'destroy']); // Supprimer un Admin/Vigile
     Route::patch('/admin-vigiles/bloquer/{id}', [AdminVigileController::class, 'bloquer']); // Bloquer un Admin/Vigile
     Route::patch('/admin-vigiles/debloquer/{id}', [AdminVigileController::class, 'debloquer']); // Débloquer un Admin/Vigile
+    Route::delete('/admin-vigiles', [AdminVigileController::class, 'supprimerPlusieursAdminVigiles']); // Supprimer plusieurs Admins/Vigiles
+    
     Route::put('/etudiants/{id}/assigner-carte', [AuthController::class, 'assignerCarte']); // Assigner une carte à un étudiant
     Route::delete('/etudiants/{id}/desassigner-carte', [AuthController::class, 'desassignerCarte']);
+
+    Route::patch('/change-mdp', [AuthController::class, 'changePwd']);
 
     // Étudiant routes
     Route::post('/register/etudiant', [AuthController::class, 'registerEtudiant']);
@@ -32,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
     Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte']);
+    Route::delete('/etudiants', [AuthController::class, 'supprimerPlusieursEtudiants']);
 });
 Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
 Route::get('/transactions', [AuthController::class, 'getAllTransactions'])->middleware('auth:sanctum');

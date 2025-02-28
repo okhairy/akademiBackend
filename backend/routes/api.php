@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminVigileController;
 
-Route::middleware('auth:sanctum')->group(function () {
+/* Route::middleware('auth:sanctum')->group(function () { */
 
     Route::get('/admin-vigiles', [AdminVigileController::class, 'index']); // Afficher la liste des Admins/Vigiles
     Route::post('/admin-vigiles', [AdminVigileController::class, 'store']); // Créer un nouvel Admin/Vigile
@@ -37,7 +37,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::delete('/etudiants', [AuthController::class, 'supprimerPlusieursEtudiants']);
-});
+
+// Authentification
+Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+Route::post('/envoyer-email', [AdminVigileController::class, 'sendEmail']);
+
+/* }); */
 Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
 Route::get('/transactions', [AuthController::class, 'getAllTransactions'])->middleware('auth:sanctum');
 Route::get('/etudiant/week-depenses', [AuthController::class, 'getWeeklyExpenses'])->middleware('auth:sanctum');
@@ -50,11 +56,6 @@ Route::get('/user', function (Request $request) {
 
 Route::patch('/admin-vigiles/change-pwd/{id}', [AdminVigileController::class, 'changePassword']);
 Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePassword']);
-
-// Authentification
-Route::post('/login', [AuthController::class, 'login']);
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-Route::post('/envoyer-email', [AdminVigileController::class, 'sendEmail']);
 
 
 

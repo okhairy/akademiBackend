@@ -15,6 +15,8 @@ use App\Mail\BienvenueEmail;
 use Illuminate\Support\Facades\Mail;
 use libphonenumber\PhoneNumberUtil;
 use libphonenumber\PhoneNumberFormat;
+use Illuminate\Support\Facades\DB;
+use App\Mail\ResetPasswordMail;
 
 class AuthController extends Controller
 {
@@ -39,7 +41,12 @@ class AuthController extends Controller
                 'required',
                 'email',
                 'regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/',
-                'unique:etudiants,email'
+                'unique:etudiants,email',
+                function ($attribute, $value, $fail) {
+                    if (AdminVigile::where('email', $value)->exists()) {
+                        $fail('Cet email est déjà utilisé par un administrateur.');
+                    }
+                },
             ],
             'telephone' => [
                 'required',
@@ -279,6 +286,10 @@ class AuthController extends Controller
 
         $credentials = $request->only('email', 'password');
 
+        if (!AdminVigile::where('email', $request->email)->exists() && !Etudiant::where('email', $request->email)->exists()) {
+            return response()->json(['error' => 'Email non valide'], 401);
+        }
+
         // Essayer de se connecter en tant qu'admin/vigile
         if (Auth::guard('admin_vigile')->attempt($credentials)) {
             $user = Auth::guard('admin_vigile')->user();
@@ -314,7 +325,7 @@ class AuthController extends Controller
         }
 
         // Si l'authentification échoue
-        return response()->json(['error' => 'L\'authentification a échoué'], 401);
+        return response()->json(['error' => 'Mot de passe incorrect'], 401);
     }
 
     public function logout(Request $request)
@@ -924,6 +935,165 @@ class AuthController extends Controller
         Etudiant::whereIn('id', $ids)->delete();
 
         return response()->json(['message' => 'Étudiants supprimés avec succès'], 200);
+    }
+
+
+        /**
+         * Mettre à jour les informations de l'utilisateur connecté.
+         *
+         * @param Request $request
+         * @return \Illuminate\Http\JsonResponse
+         */
+
+        public function updateUserInfo(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        $phoneUtil = PhoneNumberUtil::getInstance();
+
+        $request->validate([
+            'nom' => [
+                'sometimes',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                'regex:/^(?!.*  ).*$/'
+            ],
+            'prenom' => [
+                'sometimes',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                'regex:/^(?!.*  ).*$/'
+            ],
+            'email' => [
+                'sometimes',
+                'email',
+                'regex:/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/',
+                'unique:etudiants,email,' . $user->id,
+                function ($attribute, $value, $fail) {
+                    if (AdminVigile::where('email', $value)->exists()) {
+                        $fail('Cet email est déjà utilisé par un administrateur.');
+                    }
+                },
+            ],
+            'telephone' => [
+                'sometimes',
+                'string',
+                function ($attribute, $value, $fail) use ($phoneUtil) {
+                    try {
+                        $number = $phoneUtil->parse($value, null); // Détection automatique du pays
+                        if (!$phoneUtil->isValidNumber($number)) {
+                            $fail("Le numéro de téléphone n'est pas valide.");
+                        }
+                    } catch (\Exception $e) {
+                        $fail("Format du numéro invalide.");
+                    }
+                },
+                'unique:etudiants,telephone,' . $user->id
+            ],
+        ], [
+            'nom.regex' => 'Le nom ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+            'prenom.regex' => 'Le prénom ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+            'email.email' => 'L\'email doit être une adresse email valide.',
+            'email.regex' => 'Le format de l\'email est incorrect.',
+            'email.unique' => 'Cet email est déjà utilisé.',
+            'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
+            'chambre.regex' => 'La chambre ne doit pas commencer par un espace, contenir deux espaces consécutifs, et ne doit contenir que des chiffres et des lettres.',
+        ]);
+
+        $user->update($request->all());
+
+        return response()->json(['message' => 'Informations mises à jour avec succès', 'user' => $user], 200);
+    }
+
+    // Méthode pour demander la réinitialisation du mot de passe
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ], [
+            'email.required' => 'L\'email est obligatoire.',
+            'email.email' => 'L\'email doit être une adresse email valide.',
+        ]);
+
+        $email = $request->email;
+
+        // Vérifier si l'email existe dans l'une des deux tables
+        $etudiantExists = Etudiant::where('email', $email)->exists();
+        $adminVigileExists = AdminVigile::where('email', $email)->exists();
+
+        if (!$etudiantExists && !$adminVigileExists) {
+            return response()->json(['error' => 'Cet email n\'est pas valide'], 404);
+        }
+
+        $token = Str::random(60);
+
+        // Supprimer les anciens tokens pour cet email
+        DB::table('password_resets')->where('email', $email)->delete();
+
+        // Insérer le nouveau token
+        DB::table('password_resets')->insert([
+            'email' => $email,
+            'token' => $token,
+            'created_at' => Carbon::now(),
+        ]);
+
+        // Envoyer l'email de réinitialisation
+        Mail::to($email)->send(new ResetPasswordMail($token));
+
+        return response()->json(['message' => 'Email de réinitialisation envoyé avec succès.'], 200);
+    }
+
+    // Méthode pour réinitialiser le mot de passe
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token' => 'required|string',
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/[A-Z]/', // doit contenir au moins une lettre majuscule
+                'regex:/[a-z]/', // doit contenir au moins une lettre minuscule
+                'regex:/[0-9]/', // doit contenir au moins un chiffre
+                'regex:/[@$!%*?&]/' // doit contenir au moins un caractère spécial
+            ],
+        ], [
+            'token.required' => 'Le token est obligatoire.',
+            'password.required' => 'Le mot de passe est obligatoire.',
+            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
+            'password.regex' => 'Le mot de passe doit contenir au moins une lettre majuscule, une lettre minuscule, un chiffre et un caractère spécial.',
+        ]);
+
+        $tokenData = DB::table('password_resets')->where('token', $request->token)->first();
+
+        if (!$tokenData) {
+            return response()->json(['message' => 'Token invalide ou expiré.'], 400);
+        }
+
+        $email = $tokenData->email;
+
+        $user = Etudiant::where('email', $email)->first();
+        if (!$user) {
+            $user = AdminVigile::where('email', $email)->first();
+        }
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur introuvable.'], 404);
+        }
+
+        $user->mot_de_passe = Hash::make($request->password);
+        $user->save();
+
+        // Supprimer le token après utilisation
+        DB::table('password_resets')->where('email', $email)->delete();
+
+        return response()->json(['message' => 'Mot de passe réinitialisé avec succès.'], 200);
     }
 
 }

@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/etudiants/{id}/desassigner-carte', [AuthController::class, 'desassignerCarte']);
 
     Route::patch('/change-mdp', [AuthController::class, 'changePwd']);
+    Route::patch('/user/update', [AuthController::class, 'updateUserInfo']);
 
     // Étudiant routes
     Route::post('/register/etudiant', [AuthController::class, 'registerEtudiant']);
@@ -55,6 +56,8 @@ Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePa
 Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 Route::post('/envoyer-email', [AdminVigileController::class, 'sendEmail']);
+Route::post('/password/forgot', [AuthController::class, 'forgotPassword']);
+Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
 
 

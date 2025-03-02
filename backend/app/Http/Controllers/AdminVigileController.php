@@ -13,6 +13,7 @@ use App\Mail\BienvenueEmail;
 use Illuminate\Support\Str;
 use libphonenumber\PhoneNumberUtil;
 use libphonenumber\PhoneNumberFormat;
+use App\Models\Etudiant;
 
 
 class AdminVigileController extends Controller
@@ -65,7 +66,17 @@ class AdminVigileController extends Controller
                 'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
                 'regex:/^(?!.*  ).*$/'
             ],
-            'email' => 'required|string|email|unique:admin_vigiles',
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                'unique:admin_vigiles,email',
+                function ($attribute, $value, $fail) {
+                    if (Etudiant::where('email', $value)->exists()) {
+                        $fail('Cet email est déjà utilisé par un étudiant.');
+                    }
+                },
+            ],
             'telephone' => [
                 'required',
                 'string',

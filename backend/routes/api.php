@@ -50,12 +50,24 @@ Route::get('/etudiant/week-depenses', [AuthController::class, 'getWeeklyExpenses
 Route::get('/etudiant/month-depenses', [AuthController::class, 'getMonthlyExpenses'])->middleware('auth:sanctum');
 Route::get('/etudiant/last-depot', [AuthController::class, 'getLastDepositAndWeeklyExpenses'])->middleware('auth:sanctum');
 
-Route::get('/user', function (Request $request) {
+/* Route::get('/user', function (Request $request) {
     return $request->user(); 
-})->middleware('auth:sanctum');
+})->middleware('auth:sanctum'); */
+Route::get('/users', [UserController::class, 'getAllUsers']);
+
 
 Route::patch('/admin-vigiles/change-pwd/{id}', [AdminVigileController::class, 'changePassword']);
 Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePassword']);
+
+Route::get('/etudiants/nombre', [AuthController::class, 'getNombreEtudiants']);//route qui calcul le nombre total d'etudiant
+Route::get('/users', [AuthController::class, 'getAllUsers']);//recupere tous les utilisateurs 
+Route::post('/utilisateurs/register', [AuthController::class, 'register']);//route pour enregistrer des utilisateurs
+Route::put('/utilisateurs/{id}', [AuthController::class, 'updateUser']);//route pour modifeir un user selon son role
+Route::get('/utilisateurs/{id}', [AuthController::class, 'getUserById']);// route qui recupere un utilisateur par son id
+use App\Http\Controllers\BlocageController;
+
+// Route pour bloquer la carte d'un étudiant ou bloquer un admin/vigile
+Route::post('/bloquer/{id}', [AuthController::class, 'bloquer']);
 
 
 

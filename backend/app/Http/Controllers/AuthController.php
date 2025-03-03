@@ -18,6 +18,13 @@ use libphonenumber\PhoneNumberFormat;
 
 class AuthController extends Controller
 {
+    //route qui compte le nombre toral
+    public function getNombreEtudiants(): JsonResponse
+{
+    $nombreEtudiants = Etudiant::count(); // Récupère le nombre total d'étudiants
+    return response()->json(['nombre_etudiants' => $nombreEtudiants], 200);
+}
+
     // Inscription d'un étudiant
     public function registerEtudiant(Request $request)
     {
@@ -925,5 +932,298 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Étudiants supprimés avec succès'], 200);
     }
+    public function getAllUsers(): JsonResponse
+    {
+        $adminsVigiles = AdminVigile::all()->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'nom' => $user->nom,
+                'email' => $user->email,
+                'role' => $user->role, // ou 'Admin' selon ton modèle
+                'date' => $user->date_de_creation,
+                'assignation' => 'N/A',
+                
+                'selected' => false
+            ];
+        });
+    
+        $etudiants = Etudiant::all()->map(function ($etudiant) {
+            return [
+                'id' => $etudiant->id,
+                'nom' => $etudiant->nom,
+                'email' => $etudiant->email,
+                'role' => 'Etudiant',
+                'date' => $etudiant->date_de_creation,
+                'assignation' => $etudiant->uid_carte ? 'Assigné' : 'Désassigné', // Vérifie si une carte est assignée
+                'selected' => false
+            ];
+        });
+    
+        // Fusionner toutes les listes
+        $users = $adminsVigiles->merge($etudiants);
+    
+        return response()->json(['users' => $users], 200);
+    }
+    public function register(Request $request): JsonResponse
+    {
+        $phoneUtil = PhoneNumberUtil::getInstance();
 
+        $request->validate([
+            'nom' => [
+                'required',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                'regex:/^(?!.*  ).*$/'
+            ],
+            'prenom' => [
+                'required',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/',
+                'regex:/^(?!.*  ).*$/'
+            ],
+            'email' => 'required|string|email|unique:etudiants,email|unique:admin_vigiles,email',
+             'telephone' => [
+                'required',
+                'string',
+                'regex:/^(70|75|76|77|78)[0-9]{7}$/', // 9 chiffres, commençant par 70, 75, 76, 77 ou 78
+                'unique:etudiants,telephone',
+                'unique:admin_vigiles,telephone'
+            ],
+
+            'chambre' => 'nullable|string|regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/|regex:/^(?!.*  ).*$/',
+            'numero_de_dossier' => 'nullable|integer|unique:etudiants,numero_de_dossier',
+            'role' => 'required|in:etudiant,admin,vigile',
+            'statut' => 'in:active,bloqué',
+        ], [
+            'role.required' => 'Le rôle est obligatoire.',
+            'role.in' => 'Le rôle doit être soit "etudiant", "admin" ou "vigile".'
+        ]);
+
+        // Générer un mot de passe fort
+        $password = Str::random(8);
+
+        if ($request->role === 'etudiant') {
+            $user = Etudiant::create([
+                'nom' => $request->nom,
+                'prenom' => $request->prenom,
+                'email' => $request->email,
+                'telephone' => $request->telephone,
+                'chambre' => $request->chambre,
+                'numero_de_dossier' => $request->numero_de_dossier,
+                'statut' => 'active',
+                'mot_de_passe' => Hash::make($password),
+
+            ]);
+        } else {
+            $user = AdminVigile::create([
+                'nom' => $request->nom,
+                'prenom' => $request->prenom,
+                'email' => $request->email,
+                'telephone' => $request->telephone,
+               'mot_de_passe' => Hash::make($password),
+                'statut' => 'active',
+                'role' => $request->role,
+                'date_de_creation' => now(),
+            ]);
+        }
+
+        // Données pour l'email
+        $details = [
+            'nom' => $user->nom,
+            'prenom' => $user->prenom,
+            'email' => $user->email,
+            'mot_de_passe' => $password
+        ];
+
+        // Envoi de l'email de bienvenue
+        Mail::to($user->email)->send(new BienvenueEmail($details));
+
+        return response()->json(['message' => 'Utilisateur créé avec succès', 'utilisateur' => $user], 201);
+        
+    }
+    //modiication des utilsateurs (etudiant,admin ou vigile)
+    public function updateUser(Request $request, $id): JsonResponse
+    {
+        try {
+            $phoneUtil = PhoneNumberUtil::getInstance();
+            $user = null;
+            $role = $request->input('role');
+
+            // Déterminer la table de l'utilisateur
+            if (in_array($role, ['admin', 'vigile'])) {
+                $user = AdminVigile::findOrFail($id);
+            } elseif ($role === 'etudiant') {
+                $user = Etudiant::findOrFail($id);
+            } else {
+                return response()->json(['message' => 'Rôle invalide'], 400);
+            }
+
+            // Définir les règles de validation dynamiquement
+            $rules = [
+                'nom' => ['sometimes', 'string', 'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/', 'regex:/^(?!.*  ).*$/'],
+                'prenom' => ['sometimes', 'string', 'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/', 'regex:/^(?!.*  ).*$/'],
+                'email' => 'sometimes|email|unique:' . ($role === 'etudiant' ? 'etudiants' : 'admin_vigiles') . ',email,' . $id,
+                'telephone' => [
+                    'sometimes',
+                    'string',
+                    function ($attribute, $value, $fail) use ($phoneUtil) {
+                        try {
+                            $number = $phoneUtil->parse($value, null);
+                            if (!$phoneUtil->isValidNumber($number)) {
+                                $fail("Le numéro de téléphone n'est pas valide.");
+                            }
+                        } catch (\Exception $e) {
+                            $fail("Format du numéro invalide.");
+                        }
+                    },
+                    'unique:' . ($role === 'etudiant' ? 'etudiants' : 'admin_vigiles') . ',telephone,' . $id
+                ],
+            ];
+
+            // Ajouter des règles spécifiques selon le rôle
+            if ($role === 'etudiant') {
+                $rules['numero_de_dossier'] = 'sometimes|integer|unique:etudiants,numero_de_dossier,' . $id;
+                $rules['chambre'] = ['nullable', 'string', 'regex:/^[A-Za-z0-9][A-Za-z0-9 ]*$/', 'regex:/^(?!.*  ).*$/'];
+            }
+
+            if ($role === 'vigile') {
+                $rules['lieu'] = 'sometimes|string';
+            }
+
+            // Validation des données
+            $validatedData = $request->validate($rules, [
+                'nom.regex' => 'Le nom ne doit pas commencer par un espace ou contenir deux espaces consécutifs.',
+                'prenom.regex' => 'Le prénom ne doit pas commencer par un espace ou contenir deux espaces consécutifs.',
+                'email.email' => 'L\'email doit être une adresse email valide.',
+                'email.unique' => 'Cet email est déjà utilisé.',
+                'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
+                'numero_de_dossier.integer' => 'Le numéro de dossier doit être un entier.',
+                'numero_de_dossier.unique' => 'Ce numéro de dossier est déjà utilisé.',
+                'chambre.regex' => 'La chambre ne doit pas commencer par un espace ou contenir deux espaces consécutifs.',
+            ]);
+
+            // Mise à jour de l'utilisateur
+            $user->update($validatedData);
+
+            return response()->json(['message' => ucfirst($role) . ' mis à jour avec succès', 'user' => $user], 200);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => ucfirst($role) . ' introuvable'], 404);
+        }
+    }
+    //fonction qui recupre un utilisateur par son id
+    public function getUserById($id): JsonResponse
+    {
+        // Recherche dans les AdminVigiles
+        $user = AdminVigile::find($id);
+        
+        if ($user) {
+            return response()->json([
+                'id' => $user->id,
+                'nom' => $user->nom,
+                'prenom' => $user->prenom,
+                'email' => $user->email,
+                'role' => $user->role,
+                'telephone' => $user->telephone ?? null, // Ajoute ce champ si nécessaire
+                'date' => $user->date_de_creation,
+                'assignation' => 'N/A'
+            ], 200);
+        }
+    
+        // Recherche dans les Étudiants
+        $etudiant = Etudiant::find($id);
+        
+        if ($etudiant) {
+            return response()->json([
+                'id' => $etudiant->id,
+                'nom' => $etudiant->nom,
+                'prenom' => $user->prenom,
+                /* 'numero_de_dossier' => $user->numero_de_dossier, */
+                'email' => $etudiant->email,
+                'telephone' => $user->telephone ?? null, 
+                'role' => 'Etudiant',
+                'date' => $etudiant->date_de_creation,
+                'assignation' => $etudiant->uid_carte ? 'Assigné' : 'Désassigné'
+            ], 200);
+        }
+    
+        // Si aucun utilisateur n'est trouvé
+        return response()->json(['message' => 'Utilisateur non trouvé'], 404);
+    }
+    public function bloquer(Request $request, $id = null): JsonResponse
+    {
+        $user = $request->user();
+
+        // Vérifier si l'utilisateur est connecté
+      /*   if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        } */
+
+        // Si un ID est fourni, bloquer un admin/vigile
+        if ($id !== null) {
+            return $this->bloquerAdminVigile($id);
+        }
+
+        // Sinon, bloquer la carte de l'étudiant connecté
+        return $this->bloquerCarteEtudiant($user);
+    }
+
+    /**
+     * Bloquer la carte d'un étudiant.
+     *
+     * @param mixed $user (Utilisateur connecté)
+     * @return JsonResponse
+     */
+    private function bloquerCarteEtudiant($user): JsonResponse
+    {
+        // Vérifier si l'utilisateur est un étudiant
+        if (!isset($user->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
+
+        try {
+            $etudiant = Etudiant::findOrFail($user->id);
+
+            // Vérifier si la carte est déjà bloquée
+            if ($etudiant->status_carte === 'bloqué') {
+                return response()->json(['message' => 'Carte déjà bloquée'], 200);
+            }
+
+            // Bloquer la carte
+            $etudiant->status_carte = 'bloqué';
+            $etudiant->save();
+
+            return response()->json(['message' => 'Carte bloquée avec succès'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Étudiant introuvable'], 404);
+        }
+    }
+
+    /**
+     * Bloquer un admin ou un vigile.
+     *
+     * @param int $id (ID de l'admin/vigile)
+     * @return JsonResponse
+     */
+    private function bloquerAdminVigile($id): JsonResponse
+    {
+        try {
+            $adminVigile = AdminVigile::findOrFail($id);
+
+            // Vérifier si l'utilisateur est déjà bloqué
+            if ($adminVigile->statut === 'bloqué') {
+                return response()->json(['message' => 'Utilisateur déjà bloqué'], 200);
+            }
+
+            // Bloquer l'utilisateur
+            $adminVigile->statut = 'bloqué';
+            $adminVigile->save();
+
+            return response()->json(['message' => 'Utilisateur bloqué avec succès'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Utilisateur introuvable'], 404);
+        }
+    }
+
+    
 }

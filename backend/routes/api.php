@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminVigileController;
 
-Route::middleware('auth:sanctum')->group(function () {
+/* Route::middleware('auth:sanctum')->group(function () { */
 
     Route::get('/admin-vigiles', [AdminVigileController::class, 'index']); // Afficher la liste des Admins/Vigiles
     Route::post('/admin-vigiles', [AdminVigileController::class, 'store']); // Créer un nouvel Admin/Vigile
@@ -38,19 +38,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::delete('/etudiants', [AuthController::class, 'supprimerPlusieursEtudiants']);
-});
-Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
-Route::get('/transactions', [AuthController::class, 'getAllTransactions'])->middleware('auth:sanctum');
-Route::get('/etudiant/week-depenses', [AuthController::class, 'getWeeklyExpenses'])->middleware('auth:sanctum');
-Route::get('/etudiant/month-depenses', [AuthController::class, 'getMonthlyExpenses'])->middleware('auth:sanctum');
-Route::get('/etudiant/last-depot', [AuthController::class, 'getLastDepositAndWeeklyExpenses'])->middleware('auth:sanctum');
-
-Route::get('/user', function (Request $request) {
-    return $request->user(); 
-})->middleware('auth:sanctum');
-
-Route::patch('/admin-vigiles/change-pwd/{id}', [AdminVigileController::class, 'changePassword']);
-Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePassword']);
 
 // Authentification
 Route::post('/login', [AuthController::class, 'login']);
@@ -58,6 +45,32 @@ Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logo
 Route::post('/envoyer-email', [AdminVigileController::class, 'sendEmail']);
 Route::post('/password/forgot', [AuthController::class, 'forgotPassword']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
+
+/* }); */
+Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
+Route::get('/transactions', [AuthController::class, 'getAllTransactions'])->middleware('auth:sanctum');
+Route::get('/etudiant/week-depenses', [AuthController::class, 'getWeeklyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiant/month-depenses', [AuthController::class, 'getMonthlyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiant/last-depot', [AuthController::class, 'getLastDepositAndWeeklyExpenses'])->middleware('auth:sanctum');
+
+/* Route::get('/user', function (Request $request) {
+    return $request->user(); 
+})->middleware('auth:sanctum'); */
+Route::get('/users', [UserController::class, 'getAllUsers']);
+
+
+Route::patch('/admin-vigiles/change-pwd/{id}', [AdminVigileController::class, 'changePassword']);
+Route::patch('/etudiant/change-password/{id}', [AuthController::class, 'changePassword']);
+
+Route::get('/etudiants/nombre', [AuthController::class, 'getNombreEtudiants']);//route qui calcul le nombre total d'etudiant
+Route::get('/users', [AuthController::class, 'getAllUsers']);//recupere tous les utilisateurs 
+Route::post('/utilisateurs/register', [AuthController::class, 'register']);//route pour enregistrer des utilisateurs
+Route::put('/utilisateurs/{id}', [AuthController::class, 'updateUser']);//route pour modifeir un user selon son role
+Route::get('/utilisateurs/{id}', [AuthController::class, 'getUserById']);// route qui recupere un utilisateur par son id
+use App\Http\Controllers\BlocageController;
+
+// Route pour bloquer la carte d'un étudiant ou bloquer un admin/vigile
+Route::post('/bloquer/{id}', [AuthController::class, 'bloquer']);
 
 
 

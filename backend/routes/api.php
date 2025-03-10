@@ -16,7 +16,7 @@ use App\Http\Controllers\AdminVigileController;
     Route::patch('/admin-vigiles/debloquer/{id}', [AdminVigileController::class, 'debloquer']); // Débloquer un Admin/Vigile
     Route::delete('/admin-vigiles', [AdminVigileController::class, 'supprimerPlusieursAdminVigiles']); // Supprimer plusieurs Admins/Vigiles
     
-    Route::put('/etudiants/{id}/assigner-carte', [AuthController::class, 'assignerCarte']); // Assigner une carte à un étudiant
+    Route::post('/assigner-carte/{id}', [AuthController::class, 'assignerCarte']); // Assigner une carte à un étudiant
     Route::delete('/etudiants/{id}/desassigner-carte', [AuthController::class, 'desassignerCarte']);
 
     Route::patch('/change-mdp', [AuthController::class, 'changePwd']);
@@ -62,6 +62,11 @@ Route::get('/depenses-mensuelles', [AuthController::class, 'getMonthlyMeals'])->
 Route::get('/depenses-journee', [AuthController::class, 'getDailyMeals'])->middleware('auth:sanctum');
 Route::get('/mes-depot', [AuthController::class, 'getDepots'])->middleware('auth:sanctum');
 Route::get('/nbr-users', [AuthController::class, 'getTotalUsers'])->middleware('auth:sanctum');
+Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
+Route::get('/transactions', [AuthController::class, 'getAllTransactions'])/* ->middleware('auth:sanctum'); */;
+Route::get('/etudiant/week-depenses', [AuthController::class, 'getWeeklyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiant/month-depenses', [AuthController::class, 'getMonthlyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiant/last-depot', [AuthController::class, 'getLastDepositAndWeeklyExpenses'])->middleware('auth:sanctum');
 
 Route::get('/user', function (Request $request) {
     return $request->user(); 
@@ -84,6 +89,13 @@ Route::delete('/utilisateur/{id}/{role}', [AuthController::class, 'supprimerUtil
 Route::post('/bloquer/{id}', [AuthController::class, 'bloquer']);
 
 
+
+Route::post('/bloquer/{id}', [AuthController::class, 'bloquer']);// Route pour bloquer la carte d'un étudiant ou bloquer un admin/vigile
+Route::delete('/utilisateur/{id}/{role}', [AuthController::class, 'supprimerUtilisateur']);//supprimer un utilisateur selon son role
+Route::delete('/supprimer-utilisateurs/{role}', [AuthController::class, 'supprimerPlusieursUtilisateurs']);//supprimer plusieurs utilisateurs selon son role
+
+
+Route::post('/arduino-data', [AuthController::class, 'recevoirData']);//route pour recevoir les données de node.js
 
 
 

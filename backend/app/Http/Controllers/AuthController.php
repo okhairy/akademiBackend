@@ -546,9 +546,9 @@ class AuthController extends Controller
         $user = $request->user(); // Récupérer l'utilisateur connecté
 
         // Vérifier si l'utilisateur est un administrateur
-        if (!$user || $user->role !== 'admin') {
+       /*  if (!$user || $user->role !== 'admin') {
             return response()->json(['message' => 'Accès refusé'], 403);
-        }
+        } */
         
         $transactions = Transaction::all();
 
@@ -682,32 +682,42 @@ class AuthController extends Controller
      * @return \Illuminate\Http\JsonResponse
      */
     public function assignerCarte(Request $request, $id)
-    {
-        // Validation des données
-        $request->validate([
-            'uid_carte' => 'required|string|unique:etudiants,uid_carte', // UID de la carte doit être unique
-        ]);
+{
+    // Validation des données
+    $request->validate([
+        'uid_carte' => 'required|string|unique:etudiants,uid_carte,NULL,id', // Validation personnalisée pour exclure l'étudiant en cours
+    ]);
 
-        // Trouver l'étudiant par son ID
-        $etudiant = Etudiant::find($id);
+    // Trouver l'étudiant par son ID
+    $etudiant = Etudiant::find($id);
 
-        // Vérifier si l'étudiant existe
-        if (!$etudiant) {
-            return response()->json(['message' => 'Étudiant non trouvé'], 404);
-        }
-
-        // Mettre à jour l'UID de la carte et le statut
-        $etudiant->update([
-            'uid_carte' => $request->uid_carte,
-            'status_carte' => 'débloqué',
-        ]);
-
-        // Réponse JSON en cas de succès
-        return response()->json([
-            'message' => 'Carte assignée avec succès',
-            'etudiant' => $etudiant
-        ], 200);
+    // Vérifier si l'étudiant existe
+    if (!$etudiant) {
+        return response()->json(['message' => 'Étudiant non trouvé'], 404);
     }
+
+    // Vérifier si la carte est déjà assignée à un autre étudiant
+    $existingStudent = Etudiant::where('uid_carte', $request->uid_carte)->first();
+
+    if ($existingStudent) {
+        // Si un autre étudiant a déjà cette carte
+        return response()->json(['message' => 'Cette carte est déjà assignée à un autre étudiant'], 422);
+    }
+
+    // Mettre à jour l'UID de la carte et le statut
+    $etudiant->update([
+        'uid_carte' => $request->uid_carte,
+        'status_carte' => 'débloqué',
+    ]);
+
+    // Réponse JSON en cas de succès
+    return response()->json([
+        'message' => 'Carte assignée avec succès',
+        'etudiant' => $etudiant
+    ], 200);
+}
+
+    
      /**
      * Désassigner une carte d'un étudiant.
      *
@@ -987,9 +997,11 @@ class AuthController extends Controller
             return [
                 'id' => $user->id,
                 'nom' => $user->nom,
+                'prenom' => $user->prenom,
                 'email' => $user->email,
                 'role' => $user->role, // ou 'Admin' selon ton modèle
                 'date' => $user->date_de_creation,
+                "statut"=> $user->statut,
                 'assignation' => 'N/A',
                 
                 'selected' => false
@@ -1000,10 +1012,12 @@ class AuthController extends Controller
             return [
                 'id' => $etudiant->id,
                 'nom' => $etudiant->nom,
+                'prenom' => $etudiant->prenom,
                 'email' => $etudiant->email,
                 'role' => 'Etudiant',
                 'date' => $etudiant->date_de_creation,
                 'assignation' => $etudiant->uid_carte ? 'Assigné' : 'Désassigné', // Vérifie si une carte est assignée
+                "statut"=> $etudiant->statut,
                 'selected' => false
             ];
         });
@@ -1356,6 +1370,39 @@ class AuthController extends Controller
             return response()->json(['message' => 'Utilisateur introuvable'], 404);
         }
     }
+    public function supprimerPlusieursUtilisateurs(Request $request, string $role): JsonResponse
+{
+    $request->validate([
+        'ids' => 'required|array',
+        'ids.*' => 'integer',
+    ], [
+        'ids.required' => 'Les IDs des utilisateurs sont obligatoires.',
+        'ids.array' => 'Les IDs doivent être un tableau.',
+        'ids.*.integer' => 'Chaque ID doit être un entier.',
+    ]);
+
+    $model = null;
+
+    if ($role === 'etudiant') {
+        $model = Etudiant::class;
+    } elseif ($role === 'admin_vigile') {
+        $model = AdminVigile::class;
+    } else {
+        return response()->json(['message' => 'Type d\'utilisateur invalide.'], 400);
+    }
+
+    $ids = $request->input('ids');
+
+    // Vérification si les IDs existent avant suppression
+    if ($model::whereIn('id', $ids)->count() !== count($ids)) {
+        return response()->json(['message' => 'Un ou plusieurs IDs sont invalides.'], 400);
+    }
+
+    $model::whereIn('id', $ids)->delete();
+
+    return response()->json(['message' => ucfirst($role) . ' supprimés avec succès'], 200);
+}
+
 
     public function register(Request $request): JsonResponse
     {
@@ -1435,7 +1482,9 @@ class AuthController extends Controller
         
     }
 
-    public function supprimerUtilisateur($id, $role): JsonResponse
+    
+   
+        public function supprimerUtilisateur($id, $role): JsonResponse
         {
             try {
                 if ($role === 'etudiant') {
@@ -1448,10 +1497,39 @@ class AuthController extends Controller
     
                 $utilisateur->delete();
                 return response()->json(['message' => ucfirst($role) . ' supprimé avec succès'], 200);
+
+                
             } catch (ModelNotFoundException $e) {
                 return response()->json(['message' => ucfirst($role) . ' introuvable'], 404);
             }
+
+            
         }
+        public function recevoirData(Request $request)
+        {
+            // Récupérer les données envoyées par Node.js
+            $rfid = $request->input('rfid');
+    
+            // Traiter les données (par exemple, rechercher l'utilisateur en fonction du RFID)
+            // Cela dépend de la structure de ton application Laravel, mais voici un exemple :
+            $utilisateur = User::where('rfid', $rfid)->first();
+    
+            if ($utilisateur) {
+                return response()->json([
+                    'message' => 'Utilisateur trouvé.',
+                    'utilisateur' => $utilisateur,
+                ]);
+            } else {
+                return response()->json([
+                    'message' => 'Utilisateur non trouvé.',
+                ]);
+            }
+        }
+    
+    
+    
+    
+          
     public function getMonthlyMeals(): JsonResponse
     {
         $currentYear = Carbon::now()->year;

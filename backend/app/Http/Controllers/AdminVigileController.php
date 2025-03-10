@@ -152,6 +152,23 @@ class AdminVigileController extends Controller
         }
     }
 
+    public function getTransactions(Request $request): JsonResponse
+    {
+        return response()->json([
+            'user' => $request->user(),
+            'token' => $request->bearerToken(),
+        ]);
+    }
+
+    public function test (Request $request): JsonResponse
+    {
+        return response()->json([
+            'user' => $request->user(),
+            'token' => $request->bearerToken(),
+        ]);
+    }
+
+
     /**
      * Mettre à jour un Admin/Vigile existant
      */

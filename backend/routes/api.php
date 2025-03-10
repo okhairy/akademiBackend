@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminVigileController;
 
-/* Route::middleware('auth:sanctum')->group(function () { */
+//  Route::middleware('auth:sanctum')->group(function () { 
 
     Route::get('/admin-vigiles', [AdminVigileController::class, 'index']); // Afficher la liste des Admins/Vigiles
     Route::post('/admin-vigiles', [AdminVigileController::class, 'store']); // Créer un nouvel Admin/Vigile
@@ -32,12 +32,13 @@ use App\Http\Controllers\AdminVigileController;
     Route::patch('/etudiant/debloquer/{id}', [AuthController::class, 'debloquerEtudiant']);
     Route::patch('/etudiant/photo', [AuthController::class, 'updatePhoto']);
 
-    Route::post('/etudiant/depot/{id}', [AuthController::class, 'depot']);
+    Route::post('/etudiantc/depot/{id}', [AuthController::class, 'depot']);
     Route::post('/etudiant/retrait', [AuthController::class, 'retrait']);
     Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
     Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::delete('/etudiants', [AuthController::class, 'supprimerPlusieursEtudiants']);
+ 
 
 // Authentification
 Route::post('/login', [AuthController::class, 'login']);
@@ -47,15 +48,24 @@ Route::post('/password/forgot', [AuthController::class, 'forgotPassword']);
 Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
 /* }); */
-Route::get('/etudiant/transactions', [AuthController::class, 'getTransactions'])->middleware('auth:sanctum');
+Route::middleware('auth:sanctum')->group(function () {
+Route::get('/etudiant/transactions', [AdminVigileController::class, 'getTransactions']);
+});
+Route::get('/etudiant/depenes', [AdminVigileController::class, 'gettransactions'])->middleware('auth:sanctum');
+Route::get('/test', [AdminVigileController::class, 'test'])->middleware('auth:sanctum');
+Route::get('/testest', [AuthController::class, 'test'])->middleware('auth:sanctum');
 Route::get('/transactions', [AuthController::class, 'getAllTransactions'])->middleware('auth:sanctum');
-Route::get('/etudiant/week-depenses', [AuthController::class, 'getWeeklyExpenses'])->middleware('auth:sanctum');
-Route::get('/etudiant/month-depenses', [AuthController::class, 'getMonthlyExpenses'])->middleware('auth:sanctum');
-Route::get('/etudiant/last-depot', [AuthController::class, 'getLastDepositAndWeeklyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiantc/week-depenses', [AuthController::class, 'getWeeklyExpenses'])->middleware('auth:sanctum');
+Route::get('/etudiantc/month-depenses', [AuthController::class, 'getMonthlyExpenses'])->middleware('auth:sanctum');
+Route::get('/last-depot', [AuthController::class, 'getLastDepositAndWeeklyExpenses'])->middleware('auth:sanctum');
+Route::get('/depenses-mensuelles', [AuthController::class, 'getMonthlyMeals'])->middleware('auth:sanctum');
+Route::get('/depenses-journee', [AuthController::class, 'getDailyMeals'])->middleware('auth:sanctum');
+Route::get('/mes-depot', [AuthController::class, 'getDepots'])->middleware('auth:sanctum');
+Route::get('/nbr-users', [AuthController::class, 'getTotalUsers'])->middleware('auth:sanctum');
 
-/* Route::get('/user', function (Request $request) {
+Route::get('/user', function (Request $request) {
     return $request->user(); 
-})->middleware('auth:sanctum'); */
+})->middleware('auth:sanctum'); 
 Route::get('/users', [UserController::class, 'getAllUsers']);
 
 
@@ -67,7 +77,8 @@ Route::get('/users', [AuthController::class, 'getAllUsers']);//recupere tous les
 Route::post('/utilisateurs/register', [AuthController::class, 'register']);//route pour enregistrer des utilisateurs
 Route::put('/utilisateurs/{id}', [AuthController::class, 'updateUser']);//route pour modifeir un user selon son role
 Route::get('/utilisateurs/{id}', [AuthController::class, 'getUserById']);// route qui recupere un utilisateur par son id
-use App\Http\Controllers\BlocageController;
+Route::delete('/utilisateur/{id}/{role}', [AuthController::class, 'supprimerUtilisateur']);
+
 
 // Route pour bloquer la carte d'un étudiant ou bloquer un admin/vigile
 Route::post('/bloquer/{id}', [AuthController::class, 'bloquer']);

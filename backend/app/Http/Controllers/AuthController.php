@@ -467,15 +467,25 @@ class AuthController extends Controller
 
             // Vérifier si l'étudiant n'est pas bloqué
             if ($etudiant->statut === 'bloqué') {
-                return response()->json(['message' => 'Accès refusé : Étudiant bloqué'], 403);
+                return response()->json([
+                    'message' => 'Carte bloquée',
+                    'etudiant' => $etudiant
+                ], 403);
             }
 
             // Vérifier si la carte n'est pas bloquée
             if ($etudiant->status_carte === 'bloqué') {
-                return response()->json(['message' => 'Carte bloquée'], 403);
+                return response()->json([
+                    'message' => 'Carte bloquée',
+                    'etudiant' => $etudiant
+                ], 200);
             }
 
-            return response()->json(['message' => 'Accès autorisé'], 200);
+            return response()->json([
+                'message' => 'Accès autorisé',
+                'etudiant' => $etudiant
+            ], 200);
+            
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Carte invalide'], 404);
         }
@@ -483,16 +493,44 @@ class AuthController extends Controller
 
     public function getTransactions(Request $request): JsonResponse
     {
+        return response()->json([
+            'user' => $request->user(),
+            'token' => $request->bearerToken(),
+        ]);
+        // $etudiant = $request->user();
+
+
+        // if (!$etudiant) {
+        //     return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        // }
+
+        // // Vérifier si l'utilisateur est un étudiant
+        // // if (!isset($etudiant->uid_carte)) {
+        // //     return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        // // }
+
+        // $transactions = Transaction::where('id_etudiant', $etudiant->id)->get();
+
+        // if ($transactions->isEmpty()) {
+        //     return response()->json(['message' => 'Aucune transaction pour le moment'], 200);
+        // }
+
+        // return response()->json(['transactions' => $transactions], 200);
+    }
+
+    public function test (Request $request): JsonResponse
+    {
         $etudiant = $request->user();
+
 
         if (!$etudiant) {
             return response()->json(['message' => 'Utilisateur non connecté'], 401);
         }
 
         // Vérifier si l'utilisateur est un étudiant
-        if (!isset($etudiant->uid_carte)) {
-            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
-        }
+        // if (!isset($etudiant->uid_carte)) {
+        //     return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        // }
 
         $transactions = Transaction::where('id_etudiant', $etudiant->id)->get();
 
@@ -1396,4 +1434,106 @@ class AuthController extends Controller
         return response()->json(['message' => 'Utilisateur créé avec succès', 'utilisateur' => $user], 201);
         
     }
+
+    public function supprimerUtilisateur($id, $role): JsonResponse
+        {
+            try {
+                if ($role === 'etudiant') {
+                    $utilisateur = Etudiant::findOrFail($id);
+                } elseif (in_array($role, ['admin', 'vigile'])) {
+                    $utilisateur = AdminVigile::findOrFail($id);
+                } else {
+                    return response()->json(['message' => 'Type d\'utilisateur invalide'], 400);
+                }
+    
+                $utilisateur->delete();
+                return response()->json(['message' => ucfirst($role) . ' supprimé avec succès'], 200);
+            } catch (ModelNotFoundException $e) {
+                return response()->json(['message' => ucfirst($role) . ' introuvable'], 404);
+            }
+        }
+    public function getMonthlyMeals(): JsonResponse
+    {
+        $currentYear = Carbon::now()->year;
+        $meals = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $startDate = Carbon::create($currentYear, $month, 1)->startOfMonth();
+            $endDate = Carbon::create($currentYear, $month, 1)->endOfMonth();
+
+            $transactions = Transaction::whereBetween('date', [$startDate, $endDate])->get();
+
+            $petitDejeunerCount = $transactions->where('type', 'petit déjeuner')->count();
+            $dejeunerCount = $transactions->where('type', 'déjeuner')->count();
+            $dinerCount = $transactions->where('type', 'dîner')->count();
+
+            if ($month > Carbon::now()->month) {
+                break;
+            }
+
+            $totalMeals = $petitDejeunerCount + $dejeunerCount + $dinerCount;
+
+            $meals[] = [
+                'mois' => $startDate->format('F'),
+                'depenses' => $totalMeals,
+            ];
+        }
+
+        return response()->json(['meals' => $meals], 200);
+    }
+
+    public function getDailyMeals(): JsonResponse
+    {
+        $today = Carbon::today();
+
+        $transactions = Transaction::whereDate('date', $today)->get();
+
+        $petitDejeunerCount = $transactions->where('type', 'petit déjeuner')->count();
+        $dejeunerDinerCount = $transactions->whereIn('type', ['déjeuner', 'dîner'])->count();
+
+        return response()->json([
+            'date' => $today->toDateString(),
+            'dejeuner_diner' => $dejeunerDinerCount,
+            'petit_dejeuner' => $petitDejeunerCount,
+        ], 200);
+    }
+
+    public function getDepots(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        // Vérifier si l'utilisateur est un étudiant
+        if (!isset($user->uid_carte)) {
+            return response()->json(['message' => 'Accès refusé : Utilisateur non autorisé'], 403);
+        }
+
+        $depots = Transaction::where('id_etudiant', $user->id)
+            ->where('type', 'dépot')
+            ->get();
+
+        if ($depots->isEmpty()) {
+            return response()->json(['message' => 'Aucun dépôt trouvé'], 200);
+        }
+
+        return response()->json(['depots' => $depots], 200);
+    }
+
+    public function getTotalUsers(): JsonResponse
+    {
+        $nombreEtudiants = Etudiant::count();
+        $nombreAdmins = AdminVigile::where('role', 'admin')->count();
+        $nombreVigiles = AdminVigile::where('role', 'vigile')->count();
+        $nombreTotal = $nombreEtudiants + $nombreAdmins + $nombreVigiles;
+
+        return response()->json([
+            'nombre_total_utilisateurs' => $nombreTotal,
+            'nombre_admins' => $nombreAdmins,
+            'nombre_vigiles' => $nombreVigiles,
+        ], 200);
+    }
+        
 }

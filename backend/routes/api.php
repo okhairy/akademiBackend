@@ -35,7 +35,8 @@ use App\Http\Controllers\AdminVigileController;
     Route::post('/etudiantc/depot/{id}', [AuthController::class, 'depot']);
     Route::post('/etudiant/retrait', [AuthController::class, 'retrait']);
     Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
-    Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte']);
+    Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte'])->middleware('auth:sanctum');
+
     Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte']);
     Route::delete('/etudiants', [AuthController::class, 'supprimerPlusieursEtudiants']);
  

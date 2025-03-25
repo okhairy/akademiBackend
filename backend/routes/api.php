@@ -97,5 +97,6 @@ Route::delete('/supprimer-utilisateurs/{role}', [AuthController::class, 'supprim
 
 Route::post('/arduino-data', [AuthController::class, 'recevoirData']);//route pour recevoir les données de node.js
 
+Route::middleware('auth:sanctum')->get('/utilisateur-connecte', [AuthController::class, 'getUtilisateurConnecte']);
 
 

@@ -22,7 +22,7 @@ class Etudiant extends Authenticatable
     /**
      * Boot method pour le modèle.
      */
-    protected static function boot()
+   /*  protected static function boot()
     {
         parent::boot();
 
@@ -30,7 +30,7 @@ class Etudiant extends Authenticatable
         static::creating(function ($etudiant) {
             $etudiant->mot_de_passe = Hash::make($etudiant->mot_de_passe);
         });
-    }
+    } */
 
     public function getAuthPassword()
     {

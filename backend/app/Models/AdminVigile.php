@@ -42,7 +42,7 @@ class AdminVigile extends Authenticatable
     /**
      * Boot method pour le modèle.
      */
-    protected static function boot()
+   /*  protected static function boot()
     {
         parent::boot();
 
@@ -50,7 +50,7 @@ class AdminVigile extends Authenticatable
         static::creating(function ($adminVigile) {
             $adminVigile->mot_de_passe = Hash::make($adminVigile->mot_de_passe);
         });
-    }
+    } */
 
     public function getAuthPassword()
     {

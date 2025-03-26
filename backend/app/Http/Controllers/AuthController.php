@@ -447,7 +447,7 @@ class AuthController extends Controller
                 'id_etudiant' => $etudiant->id,
             ]);
 
-            return response()->json(['message' => 'Retrait effectué avec succès', 'transaction' => $transaction], 201);
+            return response()->json(['message' => 'Retrait effectué avec succès', 'transaction' => $transaction, 'etudiant' => $etudiant], 201);
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Carte invalide'], 404);
         }

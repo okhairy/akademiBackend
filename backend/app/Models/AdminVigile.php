@@ -39,18 +39,7 @@ class AdminVigile extends Authenticatable
     public $timestamps = false; // Désactive les timestamps
 
 
-    /**
-     * Boot method pour le modèle.
-     */
-    protected static function boot()
-    {
-        parent::boot();
-
-        // Événement "creating" pour définir le mot de passe par défaut
-        static::creating(function ($adminVigile) {
-            $adminVigile->mot_de_passe = Hash::make($adminVigile->mot_de_passe);
-        });
-    }
+    
 
     public function getAuthPassword()
     {

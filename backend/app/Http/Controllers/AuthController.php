@@ -874,16 +874,17 @@ class AuthController extends Controller
      * @param int $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getEtudiantById(Request $request, $id): JsonResponse
+ 
+       public function getEtudiantById(Request $request, $id): JsonResponse
     {
         $user = $request->user();
 
-        // Vérifier si l'utilisateur est authentifié
+        
         if (!$user) {
             return response()->json(['message' => 'Utilisateur non connecté'], 401);
         }
 
-        // Vérifier si l'utilisateur a le droit d'accéder à ces informations (ex: admin)
+        
         if ($user->role !== 'admin') {
             return response()->json(['message' => 'Accès refusé'], 403);
         }
@@ -894,8 +895,9 @@ class AuthController extends Controller
         } catch (ModelNotFoundException $e) {
             return response()->json(['message' => 'Étudiant introuvable'], 404);
         }
-    }
-
+    } 
+   
+    
     /**
      * Récupérer tous les étudiants.
      *
@@ -1613,5 +1615,14 @@ class AuthController extends Controller
             'nombre_vigiles' => $nombreVigiles,
         ], 200);
     }
-        
+    /* fonction pour recuprer l'utilisateur connecter */
+    public function getUtilisateurConnecte(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Utilisateur non connecté'], 401);
+        }
+
+        return response()->json($user);
+    }  
 }

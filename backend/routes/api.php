@@ -16,7 +16,8 @@ use App\Http\Controllers\AdminVigileController;
     Route::patch('/admin-vigiles/debloquer/{id}', [AdminVigileController::class, 'debloquer']); // Débloquer un Admin/Vigile
     Route::delete('/admin-vigiles', [AdminVigileController::class, 'supprimerPlusieursAdminVigiles']); // Supprimer plusieurs Admins/Vigiles
     
-    Route::post('/assigner-carte/{id}', [AuthController::class, 'assignerCarte']); // Assigner une carte à un étudiant
+   Route::post('/assigner-carte/{id}', [AuthController::class, 'assignerCarte']);  // Assigner une carte à un étudiant
+ 
     Route::delete('/etudiants/{id}/desassigner-carte', [AuthController::class, 'desassignerCarte']);
 
     Route::patch('/change-mdp', [AuthController::class, 'changePwd']);
@@ -32,7 +33,7 @@ use App\Http\Controllers\AdminVigileController;
     Route::patch('/etudiant/debloquer/{id}', [AuthController::class, 'debloquerEtudiant']);
     Route::patch('/etudiant/photo', [AuthController::class, 'updatePhoto']);
 
-    Route::post('/etudiantc/depot/{id}', [AuthController::class, 'depot']);
+    Route::post('/etudiant/depot/{id}', [AuthController::class, 'depot']);
     Route::post('/etudiant/retrait', [AuthController::class, 'retrait']);
     Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
     Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte'])->middleware('auth:sanctum');

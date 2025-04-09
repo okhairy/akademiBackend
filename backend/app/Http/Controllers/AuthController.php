@@ -1195,7 +1195,7 @@ class AuthController extends Controller
         try {
             $phoneUtil = PhoneNumberUtil::getInstance();
             $user = null;
-            $role = $request->input('role');
+            $role = $request->input('role'); 
 
             // Déterminer la table de l'utilisateur
             if (in_array($role, ['admin', 'vigile'])) {
@@ -1214,16 +1214,16 @@ class AuthController extends Controller
                 'telephone' => [
                     'sometimes',
                     'string',
-                    function ($attribute, $value, $fail) use ($phoneUtil) {
-                        try {
-                            $number = $phoneUtil->parse($value, null);
-                            if (!$phoneUtil->isValidNumber($number)) {
-                                $fail("Le numéro de téléphone n'est pas valide.");
-                            }
-                        } catch (\Exception $e) {
-                            $fail("Format du numéro invalide.");
-                        }
-                    },
+                    // function ($attribute, $value, $fail) use ($phoneUtil) {
+                    //     try {
+                    //         $number = $phoneUtil->parse($value, null);
+                    //         if (!$phoneUtil->isValidNumber($number)) {
+                    //             $fail("Le numéro de téléphone n'est pas valide.");
+                    //         }
+                    //     } catch (\Exception $e) {
+                    //         $fail("Format du numéro invalide.");
+                    //     }
+                    // },
                     'unique:' . ($role === 'etudiant' ? 'etudiants' : 'admin_vigiles') . ',telephone,' . $id
                 ],
             ];
@@ -1259,45 +1259,54 @@ class AuthController extends Controller
             return response()->json(['message' => ucfirst($role) . ' introuvable'], 404);
         }
     }
-    //fonction qui recupre un utilisateur par son id
-    public function getUserById($id): JsonResponse
+
+    /**
+     * Récupérer un utilisateur par son ID et son rôle.
+     *
+     * @param int $id
+     * @param string $role
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getUserById($id, $role): JsonResponse
     {
-        // Recherche dans les AdminVigiles
-        $user = AdminVigile::find($id);
-        
-        if ($user) {
-            return response()->json([
-                'id' => $user->id,
-                'nom' => $user->nom,
-                'prenom' => $user->prenom,
-                'email' => $user->email,
-                'role' => $user->role,
-                'telephone' => $user->telephone ?? null, // Ajoute ce champ si nécessaire
-                'date' => $user->date_de_creation,
-                'assignation' => 'N/A'
-            ], 200);
+        try {
+            if ($role === 'Etudiant') {
+                // Recherche dans la table des étudiants
+                $etudiant = Etudiant::findOrFail($id);
+
+                return response()->json([
+                    'id' => $etudiant->id,
+                    'nom' => $etudiant->nom,
+                    'prenom' => $etudiant->prenom,
+                    'email' => $etudiant->email,
+                    'telephone' => $etudiant->telephone ?? null,
+                    'role' => 'etudiant',
+                    'numero_de_dossier' => $etudiant->numero_de_dossier,
+                    'date' => $etudiant->date_de_creation,
+                    'assignation' => $etudiant->uid_carte ? 'Assigné' : 'Désassigné',
+                ], 200);
+            } elseif (in_array($role, ['admin', 'vigile'])) {
+                // Recherche dans la table des admins/vigiles
+                $adminVigile = AdminVigile::findOrFail($id);
+
+                return response()->json([
+                    'id' => $adminVigile->id,
+                    'nom' => $adminVigile->nom,
+                    'prenom' => $adminVigile->prenom,
+                    'email' => $adminVigile->email,
+                    'telephone' => $adminVigile->telephone ?? null,
+                    'role' => $adminVigile->role,
+                    'date' => $adminVigile->date_de_creation,
+                    'assignation' => 'N/A',
+                ], 200);
+            } else {
+                return response()->json(['message' => 'Rôle invalide'], 400);
+            }
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => ucfirst($role) . ' introuvable'], 404);
         }
-    
-        // Recherche dans les Étudiants
-        $etudiant = Etudiant::find($id);
-        
-        if ($etudiant) {
-            return response()->json([
-                'id' => $etudiant->id,
-                'nom' => $etudiant->nom,
-                'prenom' => $user->prenom,
-                /* 'numero_de_dossier' => $user->numero_de_dossier, */
-                'email' => $etudiant->email,
-                'telephone' => $user->telephone ?? null, 
-                'role' => 'Etudiant',
-                'date' => $etudiant->date_de_creation,
-                'assignation' => $etudiant->uid_carte ? 'Assigné' : 'Désassigné'
-            ], 200);
-        }
-    
-        // Si aucun utilisateur n'est trouvé
-        return response()->json(['message' => 'Utilisateur non trouvé'], 404);
     }
+
     public function bloquer(Request $request, $id = null): JsonResponse
     {
         $user = $request->user();
@@ -1436,6 +1445,24 @@ class AuthController extends Controller
             'numero_de_dossier' => 'nullable|integer|unique:etudiants,numero_de_dossier',
             'role' => 'required|in:etudiant,admin,vigile',
             'statut' => 'in:active,bloqué',
+            'lieu' => [
+                'nullable',
+                'required_if:role,vigile',
+                'in:campus,restaurant'
+            ],
+        ], [
+            'nom.required' => 'Le nom est obligatoire.',
+            'prenom.required' => 'Le prénom est obligatoire.',
+            'email.required' => 'L\'email est obligatoire.',
+            'email.email' => 'L\'email doit être une adresse email valide.',
+            'email.unique' => 'Cet email est déjà utilisé.',
+            'telephone.required' => 'Le numéro de téléphone est obligatoire.',
+            'telephone.regex' => 'Le numéro de téléphone doit commencer par 70, 75, 76, 77 ou 78 et contenir 9 chiffres au total.',
+            'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
+            'chambre.regex' => 'La chambre ne doit pas commencer par un espace ou contenir deux espaces consécutifs.',
+            'numero_de_dossier.integer' => 'Le numéro de dossier doit être un entier.',
+            'numero_de_dossier.unique' => 'Ce numéro de dossier est déjà utilisé.',
+
         ], [
             'role.required' => 'Le rôle est obligatoire.',
             'role.in' => 'Le rôle doit être soit "etudiant", "admin" ou "vigile".'
@@ -1457,17 +1484,25 @@ class AuthController extends Controller
 
             ]);
         } else {
-            $user = AdminVigile::create([
+            $data = [
                 'nom' => $request->nom,
                 'prenom' => $request->prenom,
                 'email' => $request->email,
                 'telephone' => $request->telephone,
-               'mot_de_passe' => Hash::make($password),
+                'mot_de_passe' => Hash::make($password),
                 'statut' => 'active',
                 'role' => $request->role,
                 'date_de_creation' => now(),
-            ]);
+            ];
+        
+            // Ajout de 'lieu' uniquement si c'est un vigile
+            if ($request->role === 'vigile') {
+                $data['lieu'] = $request->lieu;
+            }
+        
+            $user = AdminVigile::create($data);
         }
+
 
         // Données pour l'email
         $details = [

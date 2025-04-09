@@ -19,7 +19,7 @@ use App\Http\Controllers\AdminVigileController;
     Route::post('/assigner-carte/{id}', [AuthController::class, 'assignerCarte']); // Assigner une carte à un étudiant
     Route::delete('/etudiants/{id}/desassigner-carte', [AuthController::class, 'desassignerCarte']);
 
-    Route::patch('/change-mdp', [AuthController::class, 'changePwd']);
+    Route::patch('/change-mdp', [AuthController::class, 'changePwd'])->middleware('auth:sanctum');
     Route::patch('/user/update', [AuthController::class, 'updateUserInfo']);
 
     // Étudiant routes
@@ -82,7 +82,7 @@ Route::get('/etudiants/nombre', [AuthController::class, 'getNombreEtudiants']);/
 Route::get('/users', [AuthController::class, 'getAllUsers']);//recupere tous les utilisateurs 
 Route::post('/utilisateurs/register', [AuthController::class, 'register']);//route pour enregistrer des utilisateurs
 Route::put('/utilisateurs/{id}', [AuthController::class, 'updateUser']);//route pour modifeir un user selon son role
-Route::get('/utilisateurs/{id}', [AuthController::class, 'getUserById']);// route qui recupere un utilisateur par son id
+Route::get('/utilisateurs/{id}/{role}', [AuthController::class, 'getUserById']);// route qui recupere un utilisateur par son id
 Route::delete('/utilisateur/{id}/{role}', [AuthController::class, 'supprimerUtilisateur']);
 
 

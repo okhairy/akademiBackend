@@ -29,6 +29,7 @@ class AdminVigile extends Authenticatable
         'mot_de_passe',
         'statut',
         'role',
+        'lieu',
         'date_de_creation'
     ];
 

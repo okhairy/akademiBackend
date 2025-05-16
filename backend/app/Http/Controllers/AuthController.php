@@ -17,6 +17,8 @@ use libphonenumber\PhoneNumberUtil;
 use libphonenumber\PhoneNumberFormat;
 use Illuminate\Support\Facades\DB;
 use App\Mail\ResetPasswordMail;
+use Illuminate\Support\Facades\Http;
+
 
 class AuthController extends Controller
 {
@@ -391,6 +393,36 @@ class AuthController extends Controller
             return response()->json(['message' => 'Étudiant introuvable'], 404);
         }
     }
+
+    // IPN (Instant Payment Notification)
+    public function ipn(Request $request)
+    {
+        // Vérifie que le hash reçu correspond bien à tes clés
+        $hashApiKey = hash('sha256', env('PAYTECH_API_KEY'));
+        $hashApiSecret = hash('sha256', env('PAYTECH_SECRET_KEY'));
+
+        if ($request->api_key_sha256 === $hashApiKey && $request->api_secret_sha256 === $hashApiSecret) {
+            $etudiantId = $request->custom_field;
+
+            $etudiant = Etudiant::find($etudiantId);
+            if ($etudiant) {
+                $etudiant->solde += $request->item_price;
+                $etudiant->save();
+
+                Transaction::create([
+                    'date' => now(),
+                    'montant' => $request->item_price,
+                    'type' => 'dépot',
+                    'operateur' => $request->payment_method,
+                    'id_etudiant' => $etudiant->id,
+                ]);
+
+                return response('IPN OK', 200);
+            }
+        }
+
+    return response('IPN KO', 400);
+}
 
 
     public function retrait(Request $request): JsonResponse

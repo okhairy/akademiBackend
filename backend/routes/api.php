@@ -85,6 +85,12 @@ Route::put('/utilisateurs/{id}', [AuthController::class, 'updateUser']);//route 
 Route::get('/utilisateurs/{id}/{role}', [AuthController::class, 'getUserById']);// route qui recupere un utilisateur par son id
 Route::delete('/utilisateur/{id}/{role}', [AuthController::class, 'supprimerUtilisateur']);
 
+// Confirmations de paiement
+Route::post('/payment/ipn', [PaiementController::class, 'ipn'])->name('paytech.ipn');
+Route::get('/payment/success', fn() => 'Paiement réussi')->name('paytech.success');
+Route::get('/payment/cancel', fn() => 'Paiement annulé')->name('paytech.cancel');
+
+
 
 // Route pour bloquer la carte d'un étudiant ou bloquer un admin/vigile
 Route::post('/bloquer/{id}', [AuthController::class, 'bloquer']);

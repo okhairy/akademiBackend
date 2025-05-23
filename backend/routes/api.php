@@ -34,7 +34,7 @@ use App\Http\Controllers\AdminVigileController;
     Route::patch('/etudiant/photo', [AuthController::class, 'updatePhoto']);
 
     Route::post('/etudiant/depot/{id}', [AuthController::class, 'depot']);
-    Route::post('/etudiant/retrait', [AuthController::class, 'retrait']);
+    Route::post('/etudiant/retrait', [AuthController::class, 'retrait']);//acceder au resto
     Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
     Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte'])->middleware('auth:sanctum');
 

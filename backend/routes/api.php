@@ -37,7 +37,7 @@ use App\Http\Controllers\AdminVigileController;
     Route::post('/etudiant/acces-campus', [AuthController::class, 'accesCampus']);
     Route::patch('/etudiant/bloquer-carte', [AuthController::class, 'bloquerCarte'])->middleware('auth:sanctum');
 
-    Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte']);
+    Route::patch('/etudiant/debloquer-carte', [AuthController::class, 'bloquerCarte'])->middleware('auth:sanctum');
     Route::delete('/etudiants', [AuthController::class, 'supprimerPlusieursEtudiants']);
  
 
@@ -90,6 +90,7 @@ Route::post('/payment/ipn', [PaiementController::class, 'ipn'])->name('paytech.i
 Route::get('/payment/success', fn() => 'Paiement réussi')->name('paytech.success');
 Route::get('/payment/cancel', fn() => 'Paiement annulé')->name('paytech.cancel');
 
+Route::post('/debloquer/{id}', [AuthController::class, 'debloquer']);
 
 
 // Route pour bloquer la carte d'un étudiant ou bloquer un admin/vigile

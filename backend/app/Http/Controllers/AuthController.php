@@ -1329,7 +1329,7 @@ class AuthController extends Controller
                     'telephone' => $adminVigile->telephone ?? null,
                     'role' => $adminVigile->role,
                     'date' => $adminVigile->date_de_creation,
-                    'assignation' => 'N/A',
+                    'lieu' => $adminVigile->lieu ?? null,
                 ], 200);
             } else {
                 return response()->json(['message' => 'Rôle invalide'], 400);
@@ -1339,23 +1339,70 @@ class AuthController extends Controller
         }
     }
 
-    public function bloquer(Request $request, $id = null): JsonResponse
+    public function bloquer(Request $request, $id): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $role = $request->input('role'); // 'etudiant', 'admin' ou 'vigile'
 
-        // Vérifier si l'utilisateur est connecté
-      /*   if (!$user) {
-            return response()->json(['message' => 'Utilisateur non connecté'], 401);
-        } */
+            if (!$role) {
+                return response()->json(['message' => 'Le rôle est requis.'], 400);
+            }
 
-        // Si un ID est fourni, bloquer un admin/vigile
-        if ($id !== null) {
-            return $this->bloquerAdminVigile($id);
+            if ($role === 'etudiant') {
+                $etudiant = Etudiant::findOrFail($id);
+                $etudiant->statut = 'bloqué';
+                $etudiant->save();
+
+                return response()->json(['message' => 'Étudiant bloqué avec succès.'], 200);
+            } elseif (in_array($role, ['admin', 'vigile'])) {
+                $adminVigile = AdminVigile::findOrFail($id);
+                $adminVigile->statut = 'bloqué';
+                $adminVigile->save();
+
+                return response()->json(['message' => ucfirst($role) . ' bloqué avec succès.'], 200);
+            }
+
+            return response()->json(['message' => 'Rôle invalide.'], 400);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Utilisateur introuvable.'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Erreur serveur : ' . $e->getMessage()], 500);
         }
-
-        // Sinon, bloquer la carte de l'étudiant connecté
-        return $this->bloquerCarteEtudiant($user);
     }
+
+    public function debloquer(Request $request, $id): JsonResponse
+    {
+        try {
+            $role = $request->input('role');
+
+            if (!$role) {
+                return response()->json(['message' => 'Le rôle est requis.'], 400);
+            }
+
+            if ($role === 'etudiant') {
+                $etudiant = Etudiant::findOrFail($id);
+                $etudiant->statut = 'active';
+                $etudiant->save();
+
+                return response()->json(['message' => 'Étudiant débloqué avec succès.'], 200);
+            } elseif (in_array($role, ['admin', 'vigile'])) {
+                $adminVigile = AdminVigile::findOrFail($id);
+                $adminVigile->statut = 'active';
+                $adminVigile->save();
+
+                return response()->json(['message' => ucfirst($role) . ' débloqué avec succès.'], 200);
+            }
+
+            return response()->json(['message' => 'Rôle invalide.'], 400);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['message' => 'Utilisateur introuvable.'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Erreur serveur : ' . $e->getMessage()], 500);
+        }
+    }
+
 
     /**
      * Bloquer la carte d'un étudiant.

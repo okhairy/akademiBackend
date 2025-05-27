@@ -500,7 +500,7 @@ class AuthController extends Controller
             // Vérifier si l'étudiant n'est pas bloqué
             if ($etudiant->statut === 'bloqué') {
                 return response()->json([
-                    'message' => 'Carte bloquée',
+                    'message' => 'Utilsateur bloqué',
                     'etudiant' => $etudiant
                 ], 403);
             }
